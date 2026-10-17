@@ -709,7 +709,7 @@ if (!gotLock) {
       saveSettings({ hotkeyKey: 'fn', bindings: { dictation: 'fn', translate: 'fn+shift', rewrite: '', ask: 'fn+space' } })
       hotkeys.registerAll()
     }
-    // 非 macOS 读不到 Fn：主键仍是 fn（如从 macOS 拷来的设置）→ 换成本平台默认（Windows 右 Ctrl，GAP-008）
+    // 非 macOS 读不到 Fn：主键仍是 fn（如从 macOS 拷来的设置）→ 换成本平台默认（Windows 右 Shift，GAP-008）
     if (!isMac && /(^|\+)fn(\+|$)/i.test(b?.dictation ?? '')) {
       saveSettings(defaultBindings(process.platform))
       hotkeys.registerAll()

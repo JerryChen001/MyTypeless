@@ -26,9 +26,10 @@ test('parseBinding：空串与未知修饰键返回 null', () => {
   assert.equal(parseBinding('x', 'hyper+k'), null)
 })
 
-test('默认快捷键：macOS 用 Fn，Windows 用右 Ctrl，且都能被解析', () => {
+test('默认快捷键：macOS 用 Fn，Windows 用右 Shift，且都能被解析', () => {
   assert.deepEqual(defaultBindings('darwin'), { hotkeyKey: 'fn', bindings: { dictation: 'fn', translate: 'fn+shift', rewrite: '', ask: 'fn+space' } })
   const win = defaultBindings('win32')
-  assert.deepEqual(win, { hotkeyKey: 'rctrl', bindings: { dictation: 'rctrl', translate: 'rctrl+shift', rewrite: '', ask: 'rctrl+space' } })
+  assert.deepEqual(win, { hotkeyKey: 'rshift', bindings: { dictation: 'rshift', translate: 'rshift+ctrl', rewrite: '', ask: 'rshift+space' } })
+  assert.deepEqual(parseBinding('translate', win.bindings.translate)?.match, { name: 'translate', key: 'ctrl', require: ['rshift'] })
   for (const combo of [win.bindings.dictation, win.bindings.translate, win.bindings.ask]) assert.ok(parseBinding('m', combo))
 })

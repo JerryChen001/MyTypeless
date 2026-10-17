@@ -9,7 +9,7 @@
 | `providers/asr.ts` | ASR 提供方：`OpenAiCompatAsr`、`LocalWhisperAsr`，工厂 `createAsrProvider` |
 | `polish.ts` | 本地清理规则 + `LlmPolisher`（润色/翻译/改写/提问的提示词与调用） |
 | `hotkeys.ts` | `HotkeyController`：原生优先、`globalShortcut` 兜底与重试 |
-| `bindings.ts` | 绑定解析 `parseBinding`（纯逻辑）：组合键 → 原生助手匹配规则 + 兜底加速键；支持区分左右的修饰键（`rctrl` 等） |
+| `bindings.ts` | 绑定解析 `parseBinding`（纯逻辑）：组合键 → 原生助手匹配规则 + 兜底加速键；支持区分左右的修饰键（`rshift`、`rctrl` 等） |
 | `live.ts` | 实时转写调度（纯逻辑，D-013）：VAD、停顿即识别、限频预览、长段定稿 |
 | `learn.ts` / `learner.ts` | 自动词典（D-012）：专有名词提取、修改比对（纯逻辑）/ 写入后追踪与计数 |
 | `text.ts` | 文本规整：中文标点、`joinText`、幻觉过滤、FireRedASR2 特殊标记 `stripAsrTokens` 与大小写恢复 |

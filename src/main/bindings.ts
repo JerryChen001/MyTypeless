@@ -3,7 +3,7 @@ import type { HotkeyMatchConfig } from './native'
 /**
  * 快捷键绑定解析（纯逻辑，不依赖 electron，便于测试）：
  * "fn+space" → 原生助手的匹配规则 { key: 'space', require: ['fn'] } + globalShortcut 兜底用的加速键。
- * 修饰键除了通用的 opt / cmd / ctrl / shift / fn，还可以写区分左右的 rctrl、ropt 等（Windows 默认主键右 Ctrl，GAP-008）。
+ * 修饰键除了通用的 opt / cmd / ctrl / shift / fn，还可以写区分左右的 rctrl、ropt 等（Windows 默认主键右 Shift，GAP-008）。
  */
 
 const MOD_MAP: Record<string, string> = {
@@ -34,7 +34,7 @@ const ACCEL_KEY: Record<string, string> = {
 /** 单修饰键触发（只有原生助手支持） */
 const MODIFIER_ONLY_KEYS = new Set([
   'fn', 'ropt', 'rightoption', 'lopt', 'leftoption', 'rcmd', 'rightcmd', 'lcmd', 'leftcmd',
-  'rshift', 'rightshift', 'lshift', 'leftshift', 'rctrl', 'rightcontrol', 'lctrl', 'leftcontrol'
+  'rshift', 'rightshift', 'lshift', 'leftshift', 'rctrl', 'rightcontrol', 'lctrl', 'leftcontrol', 'ralt', 'lalt'
 ])
 
 export interface ParsedBinding {

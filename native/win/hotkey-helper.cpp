@@ -5,7 +5,9 @@
 // - 普通键触发（如 rctrl+space）：吞掉触发键（含自动重复），松开触发键或先松开修饰键都算结束。
 // - 单修饰键触发（如 rctrl）：不吞（避免修饰键状态卡死）；按住期间按了其他键 → abort 并放行该键；
 //   若组成另一条注册组合（rctrl+space、rctrl+shift），先 abort 再发那条组合的 down。
-// - 修饰键组合（rctrl+shift）的第二个修饰键成对吞掉：Windows 默认 Ctrl+Shift 切换键盘布局。
+// - 修饰键组合（ralt+shift）的第二个修饰键成对吞掉：Windows 默认 Ctrl+Shift / Alt+Shift 切换键盘布局 / 输入语言。
+// - 单修饰键触发是 Alt / Win 时，按下后补发一个未分配的键（0xE8）：否则单独松开 Alt 会激活菜单栏、Win 会打开开始菜单。
+// - AltGr 布局按右 Alt 时系统插入的假左 Ctrl 不计入修饰键状态。
 // - require 除 opt/cmd/ctrl/shift 外，还可以是区分左右的 rctrl/lctrl/ropt/lopt/rshift/lshift/rcmd/lcmd
 //   （该侧必须按着，同时算作对应的通用修饰键）。Windows 键盘读不到 fn：写 stderr 后跳过。
 // 父进程退出后立即退出。退出码：2 配置错误（或没有有效绑定）、4 安装钩子失败。
@@ -115,7 +117,9 @@ static const std::map<std::string, std::vector<WORD>> kModifierKeys = {
     {"ralt", {VK_RMENU}},     {"lalt", {VK_LMENU}},
     {"rshift", {VK_RSHIFT}},  {"rightshift", {VK_RSHIFT}},     {"lshift", {VK_LSHIFT}},  {"leftshift", {VK_LSHIFT}},
     {"rcmd", {VK_RWIN}},      {"rightcmd", {VK_RWIN}},         {"lcmd", {VK_LWIN}},      {"leftcmd", {VK_LWIN}},
-    {"shift", {VK_LSHIFT, VK_RSHIFT}},  // 只用于组合（如 rctrl+shift），左右都算
+    // 只用于组合（如 rshift+ctrl），左右都算
+    {"shift", {VK_LSHIFT, VK_RSHIFT}}, {"ctrl", {VK_LCONTROL, VK_RCONTROL}}, {"control", {VK_LCONTROL, VK_RCONTROL}},
+    {"alt", {VK_LMENU, VK_RMENU}},     {"opt", {VK_LMENU, VK_RMENU}},
 };
 
 static WORD NormalKey(const std::string &k) {
@@ -177,6 +181,31 @@ static std::vector<Rule> g_rules;
 static const Rule *g_active = nullptr;
 static bool g_held[256];               // 物理按键状态（不含模拟按键）
 static std::set<DWORD> g_swallowedMods; // 吞掉了按下的修饰键：抬起也要吞
+static bool g_maskPending = false;      // 需要补发菜单屏蔽键（见 SendMenuMask）
+static const Rule *g_pending = nullptr; // 单修饰键触发：已按下、尚未确认（见 OnPending）
+static const UINT HOLD_MS = 150;
+static UINT_PTR g_holdTimer = 0;
+static bool g_replay = false;           // --replay：不用计时器，由 "tick" 行代替
+
+static void StartHoldTimer() {
+  if (!g_replay) g_holdTimer = SetTimer(nullptr, 0, HOLD_MS, nullptr);
+}
+static void StopHoldTimer() {
+  if (g_holdTimer) KillTimer(nullptr, g_holdTimer);
+  g_holdTimer = 0;
+}
+static DWORD g_mainThread = 0;
+static const UINT WM_MT_MASK = WM_APP + 1;
+static const WORD MENU_MASK_VK = 0xE8;  // 未分配的虚拟键
+
+/** 在钩子返回之后（消息循环里）发送，保证排在触发键的按下之后 */
+static void SendMenuMask() {
+  INPUT in[2] = {};
+  in[0].type = in[1].type = INPUT_KEYBOARD;
+  in[0].ki.wVk = in[1].ki.wVk = MENU_MASK_VK;
+  in[1].ki.dwFlags = KEYEVENTF_KEYUP;
+  SendInput(2, in, sizeof(INPUT));
+}
 
 static void Emit(const std::string &name, const char *phase) {
   std::string line = "{\"name\":" + JsonString(name) + ",\"phase\":\"" + phase + "\"}\n";
@@ -207,7 +236,53 @@ static bool ModifiersMatch(const Rule &r, DWORD curVk, bool curDown) {
 }
 
 /** 返回 true = 吞掉该事件 */
+/**
+ * 单修饰键触发挂起期间（按下不到 HOLD_MS）：
+ * - 松开触发键 = 轻按：补发 down + up；
+ * - 按下的键组成注册组合（rshift+space、rshift+ctrl）：直接发那条组合的 down，并吞掉该键；
+ * - 按下其他键（如右 Shift+字母打大写）：悄悄放弃，什么都不发，按键照常传给系统。
+ * 返回 1 = 吞掉、0 = 放行、-1 = 已放弃挂起，继续按空闲状态处理。
+ */
+static int OnPending(DWORD vk, bool isDown, bool repeat) {
+  const Rule &p = *g_pending;
+  if (p.triggers.count(vk)) {
+    if (isDown) return 0; // 按住时的自动重复
+    StopHoldTimer();
+    g_pending = nullptr;
+    Emit(p.name, "down");
+    Emit(p.name, "up");
+    return 0;
+  }
+  if (!isDown) return 0;
+  if (repeat) return 0;
+  StopHoldTimer();
+  g_pending = nullptr;
+  for (const Rule &r : g_rules) {
+    bool combo = IsModifierVk(vk) ? r.modifierOnly && r.triggers.count(vk) && !r.sides.empty() && ModifiersMatch(r, vk, true)
+                                  : !r.modifierOnly && r.trigger == vk && ModifiersMatch(r, vk, true);
+    if (!combo) continue;
+    Emit(r.name, "down");
+    g_active = &r;
+    if (IsModifierVk(vk)) g_swallowedMods.insert(vk);
+    return 1;
+  }
+  return -1;
+}
+
+/** 挂起满 HOLD_MS 且期间没有别的键：确认按住 */
+static void ConfirmPending() {
+  StopHoldTimer();
+  if (!g_pending) return;
+  Emit(g_pending->name, "down");
+  g_active = g_pending;
+  g_pending = nullptr;
+}
+
 static bool OnKey(DWORD vk, bool isDown, bool repeat) {
+  if (g_pending) {
+    int r = OnPending(vk, isDown, repeat);
+    if (r >= 0) return r == 1;
+  }
   if (!IsModifierVk(vk)) {
     if (g_active) {
       const Rule &a = *g_active;
@@ -287,12 +362,17 @@ static bool OnKey(DWORD vk, bool isDown, bool repeat) {
       // 单修饰键触发要求没有其他修饰键；修饰键组合（rctrl+shift）要求恰好是 require 里的修饰键
       unsigned others = HeldFlags(vk, true) & ~FlagOf(vk);
       if (others != (r.reqFlags & ~FlagOf(vk)) || !SidesHeld(r, vk, true)) continue;
-      Emit(r.name, "down");
-      g_active = &r;
       if (!r.sides.empty()) {
+        Emit(r.name, "down");
+        g_active = &r;
         g_swallowedMods.insert(vk);
         return true;
       }
+      // 单修饰键触发先挂起，按住满 HOLD_MS 才确认（见 OnPending）：避免右 Shift+字母打大写时误开录音
+      g_pending = &r;
+      StartHoldTimer();
+      // 单独按下再松开 Alt / Win 会激活菜单栏 / 开始菜单：钩子返回后补发一个未分配的键，让系统认为它被组合使用了
+      if (FlagOf(vk) & (ALT | WIN)) g_maskPending = true;
       return false;
     }
   }
@@ -305,12 +385,18 @@ static LRESULT CALLBACK HookProc(int code, WPARAM wp, LPARAM lp) {
   if (code == HC_ACTION) {
     auto *k = (KBDLLHOOKSTRUCT *)lp;
     // 程序模拟的按键（mt-inject 键入、其他软件）不参与匹配，也不计入物理按键状态
-    if (!(k->flags & LLKHF_INJECTED) && k->vkCode < 256) {
+    // AltGr 布局（德语、法语等）按右 Alt 时系统先插一个假的左 Ctrl（扫描码 0x21D）：不当成真的 Ctrl
+    bool fakeCtrl = k->vkCode == VK_LCONTROL && (k->scanCode & 0x200);
+    if (!(k->flags & LLKHF_INJECTED) && !fakeCtrl && k->vkCode < 256) {
       bool isDown = !(k->flags & LLKHF_UP);
       DWORD vk = k->vkCode;
       bool repeat = isDown && g_held[vk];
       bool swallow = OnKey(vk, isDown, repeat);
       g_held[vk] = isDown;
+      if (g_maskPending) {
+        g_maskPending = false;
+        PostThreadMessageW(g_mainThread, WM_MT_MASK, 0, 0);
+      }
       if (swallow) return 1;
     }
   }
@@ -334,16 +420,18 @@ static DWORD WINAPI WatchParent(LPVOID) {
 }
 
 /**
- * 测试用（mt-hotkey '<config>' --replay）：不安装钩子，从 stdin 逐行读 "<键名> down|up"，
+ * 测试用（mt-hotkey '<config>' --replay）：不安装钩子，从 stdin 逐行读 "<键名> down|up"（"tick" = 按住满 HOLD_MS），
  * 按与钩子相同的状态机处理；事件照常输出，被吞掉的按键另输出 {"swallowed":"<行>"}。
  */
 static int Replay() {
+  g_replay = true;
   std::string input = ReadAllStdin(), line;
   for (size_t i = 0; i <= input.size(); i++) {
     if (i < input.size() && input[i] != '\n') {
       if (input[i] != '\r') line += input[i];
       continue;
     }
+    if (line == "tick") ConfirmPending(); // 相当于按住满 HOLD_MS
     size_t sp = line.find(' ');
     if (sp != std::string::npos) {
       std::string key = line.substr(0, sp), phase = line.substr(sp + 1);
@@ -356,6 +444,11 @@ static int Replay() {
         g_held[vk] = isDown;
         if (swallow) {
           std::string out = "{\"swallowed\":" + JsonString(line) + "}\n";
+          fwrite(out.data(), 1, out.size(), stdout);
+        }
+        if (g_maskPending) {
+          g_maskPending = false;
+          std::string out = "{\"masked\":" + JsonString(line) + "}\n";
           fwrite(out.data(), 1, out.size(), stdout);
         }
       }
@@ -423,6 +516,7 @@ int wmain(int argc, wchar_t **argv) {
   for (int vk = 1; vk < 256; vk++) g_held[vk] = (GetAsyncKeyState(vk) & 0x8000) != 0;
 
   CreateThread(nullptr, 0, WatchParent, nullptr, 0, nullptr);
+  g_mainThread = GetCurrentThreadId();
   g_hook = SetWindowsHookExW(WH_KEYBOARD_LL, HookProc, GetModuleHandleW(nullptr), 0);
   if (!g_hook) {
     fputs("hook install failed\n", stderr);
@@ -431,6 +525,14 @@ int wmain(int argc, wchar_t **argv) {
   Emit("system", "ready");
   MSG msg;
   while (GetMessageW(&msg, nullptr, 0, 0) > 0) {
+    if (msg.message == WM_MT_MASK) {
+      SendMenuMask();
+      continue;
+    }
+    if (msg.message == WM_TIMER && msg.wParam == g_holdTimer) {
+      ConfirmPending();
+      continue;
+    }
     TranslateMessage(&msg);
     DispatchMessageW(&msg);
   }

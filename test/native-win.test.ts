@@ -53,47 +53,60 @@ test('mt-inject：参数错误、非法 base64、不支持的组合键退出码 
   assert.equal(run('mt-inject', ['--combo', 'hyper+c']).code, 2)
 })
 
-// mt-hotkey 的状态机用 --replay 测（不安装钩子）：物理按键无法由程序模拟，钩子本身需要真机验收
+// mt-hotkey 的状态机用 --replay 测（不安装钩子）：物理按键无法由程序模拟，钩子本身需要真机验收。
+// "tick" = 单修饰键按住满 HOLD_MS（150ms）
 const HOTKEY_CFG = JSON.stringify({
   matches: [
-    { name: 'dictation', key: 'rctrl' },
-    { name: 'ask', key: 'space', require: ['rctrl'] },
-    { name: 'translate', key: 'shift', require: ['rctrl'] }
+    { name: 'dictation', key: 'rshift' },
+    { name: 'ask', key: 'space', require: ['rshift'] },
+    { name: 'translate', key: 'ctrl', require: ['rshift'] }
   ]
 })
-const replay = (keys: string) =>
-  run('mt-hotkey', [HOTKEY_CFG, '--replay'], keys)
+const replay = (keys: string, cfg = HOTKEY_CFG) =>
+  run('mt-hotkey', [cfg, '--replay'], keys)
     .out.trim()
     .split('\n')
     .filter(Boolean)
     .map((l) => {
-      const j = JSON.parse(l) as { name?: string; phase?: string; swallowed?: string }
-      return j.swallowed ? `吞:${j.swallowed}` : `${j.name}:${j.phase}`
+      const j = JSON.parse(l) as { name?: string; phase?: string; swallowed?: string; masked?: string }
+      return j.swallowed ? `吞:${j.swallowed}` : j.masked ? `屏蔽菜单:${j.masked}` : `${j.name}:${j.phase}`
     })
 
-test('mt-hotkey：按住右 Ctrl 说话，自动重复不重复触发，右 Ctrl 本身不吞', { skip }, () => {
-  assert.deepEqual(replay('rctrl down\nrctrl down\nrctrl up\n'), ['dictation:down', 'dictation:up'])
+test('mt-hotkey：按住右 Shift 满 150ms 才开始说话；自动重复不重复触发；轻按补发 down + up', { skip }, () => {
+  assert.deepEqual(replay('rshift down\ntick\nrshift down\nrshift up\n'), ['dictation:down', 'dictation:up'])
+  assert.deepEqual(replay('rshift down\nrshift up\n'), ['dictation:down', 'dictation:up'])
 })
 
-test('mt-hotkey：右 Ctrl+空格 切到提问，空格（含重复）被吞', { skip }, () => {
-  assert.deepEqual(replay('rctrl down\nspace down\nspace down\nspace up\nrctrl up\n'), [
-    'dictation:down', 'dictation:abort', 'ask:down', '吞:space down', '吞:space down', 'ask:up', '吞:space up'
+test('mt-hotkey：右 Shift+字母打大写（150ms 内）什么都不发；之后再按字母才 abort', { skip }, () => {
+  assert.deepEqual(replay('rshift down\na down\na up\nrshift up\n'), [])
+  assert.deepEqual(replay('rshift down\ntick\na down\na up\nrshift up\n'), ['dictation:down', 'dictation:abort'])
+})
+
+test('mt-hotkey：右 Shift+空格 提问、右 Shift+Ctrl 翻译，触发键被吞（Ctrl 成对吞，避免切换键盘布局）', { skip }, () => {
+  assert.deepEqual(replay('rshift down\nspace down\nspace down\nspace up\nrshift up\n'), [
+    'ask:down', '吞:space down', '吞:space down', 'ask:up', '吞:space up'
+  ])
+  assert.deepEqual(replay('rshift down\nlctrl down\nlctrl up\nrshift up\n'), ['translate:down', '吞:lctrl down', 'translate:up', '吞:lctrl up'])
+  // 已开始说话后再组合：先 abort 听写再切过去
+  assert.deepEqual(replay('rshift down\ntick\nspace down\nspace up\nrshift up\n'), [
+    'dictation:down', 'dictation:abort', 'ask:down', '吞:space down', 'ask:up', '吞:space up'
   ])
 })
 
-test('mt-hotkey：右 Ctrl+Shift 切到翻译，Shift 按下与抬起成对被吞（避免切换键盘布局）', { skip }, () => {
-  assert.deepEqual(replay('rctrl down\nrshift down\nrshift up\nrctrl up\n'), [
-    'dictation:down', 'dictation:abort', 'translate:down', '吞:rshift down', 'translate:up', '吞:rshift up'
-  ])
+test('mt-hotkey：左 Shift、先按着别的修饰键再按右 Shift 都不触发', { skip }, () => {
+  assert.deepEqual(replay('lshift down\nlshift up\nspace down\nspace up\n'), [])
+  assert.deepEqual(replay('lctrl down\nrshift down\ntick\nrshift up\nlctrl up\n'), [])
 })
 
-test('mt-hotkey：右 Ctrl+其他键 = 普通组合键，abort 并放行；左 Ctrl+空格、单独 Shift 不触发', { skip }, () => {
-  assert.deepEqual(replay('rctrl down\nc down\nc up\nrctrl up\n'), ['dictation:down', 'dictation:abort'])
-  assert.deepEqual(replay('lctrl down\nspace down\nspace up\nlctrl up\nlshift down\nlshift up\n'), [])
+test('mt-hotkey：右 Alt / 右 Ctrl 作主键；右 Alt 按下时补发菜单屏蔽键', { skip }, () => {
+  const ralt = JSON.stringify({ matches: [{ name: 'dictation', key: 'ralt' }] })
+  assert.deepEqual(replay('ralt down\ntick\nralt up\n', ralt), ['屏蔽菜单:ralt down', 'dictation:down', 'dictation:up'])
+  const rctrl = JSON.stringify({ matches: [{ name: 'dictation', key: 'rctrl' }, { name: 'ask', key: 'space', require: ['rctrl'] }] })
+  assert.deepEqual(replay('rctrl down\nc down\nc up\nrctrl up\n', rctrl), [])
+  assert.deepEqual(replay('rctrl down\ntick\nrctrl up\n', rctrl), ['dictation:down', 'dictation:up'])
 })
 
-test('mt-hotkey：先按着别的修饰键再按右 Ctrl 不触发；配置错误或只有 fn 时退出码 2', { skip }, () => {
-  assert.deepEqual(replay('lshift down\nrctrl down\nrctrl up\nlshift up\n'), [])
+test('mt-hotkey：配置错误或只有 fn 时退出码 2', { skip }, () => {
   assert.equal(run('mt-hotkey', ['not json', '--replay']).code, 2)
   assert.equal(run('mt-hotkey', [JSON.stringify({ matches: [{ name: 'dictation', key: 'fn' }] }), '--replay']).code, 2)
 })
