@@ -146,6 +146,7 @@ struct UiaJob {
   bool caret = false;  // false：--selected-text；true：--caret-context
   int before = 0, after = 0;
   int code = 5;        // 默认“读不到”
+  bool password = false; // UI Automation 认出焦点是密码框：什么都不读，后备读取也跳过
   std::string out;
 };
 
@@ -194,7 +195,7 @@ static bool WakeChromiumAccessibility() {
   return true;
 }
 
-static bool FocusedTextPattern(IUIAutomation *uia, ComPtr<IUIAutomationTextPattern> &tp) {
+static bool FocusedTextPattern(IUIAutomation *uia, ComPtr<IUIAutomationTextPattern> &tp, bool &password) {
   bool chromium = false;
   for (int attempt = 0; attempt < 4; attempt++) {
     if (attempt == 1) chromium = WakeChromiumAccessibility();
@@ -203,8 +204,11 @@ static bool FocusedTextPattern(IUIAutomation *uia, ComPtr<IUIAutomationTextPatte
 
     ComPtr<IUIAutomationElement> el;
     if (FAILED(uia->GetFocusedElement(&el)) || !el) continue;
-    BOOL password = FALSE;
-    if (SUCCEEDED(el->get_CurrentIsPassword(&password)) && password) return false;
+    BOOL isPassword = FALSE;
+    if (SUCCEEDED(el->get_CurrentIsPassword(&isPassword)) && isPassword) {
+      password = true;
+      return false;
+    }
     if (SUCCEEDED(el->GetCurrentPatternAs(UIA_TextPatternId, IID_PPV_ARGS(&tp))) && tp) return true;
   }
   return false;
@@ -276,7 +280,7 @@ static void ReadViaUia(UiaJob &job) {
   if (FAILED(CoCreateInstance(__uuidof(CUIAutomation), nullptr, CLSCTX_INPROC_SERVER, IID_PPV_ARGS(&uia))) || !uia) return;
   ComPtr<IUIAutomationTextPattern> tp;
   ComPtr<IUIAutomationTextRange> range;
-  if (!FocusedTextPattern(uia.Get(), tp) || !FirstSelection(tp.Get(), range)) return;
+  if (!FocusedTextPattern(uia.Get(), tp, job.password) || !FirstSelection(tp.Get(), range)) return;
 
   if (!job.caret) return Finish(job, RangeText(range.Get()), L"", L"");
 
@@ -298,7 +302,7 @@ static DWORD WINAPI UiaThread(LPVOID p) {
   auto &job = *(UiaJob *)p;
   ReadViaUia(job);
   // 有的编辑框（如 WinForms 文本框）经系统代理声称支持文本模式，读出来却是空的：再按标准编辑框直接读一次
-  if (job.code != 0) ReadEditControl(job);
+  if (job.code != 0 && !job.password) ReadEditControl(job);
   CoUninitialize();
   return 0;
 }

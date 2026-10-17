@@ -9,6 +9,7 @@
 const { execFileSync } = require('child_process')
 const { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } = require('fs')
 const os = require('os')
+const { createHash } = require('crypto')
 const { join } = require('path')
 
 if (process.platform !== 'win32') {
@@ -24,6 +25,9 @@ const HELPERS = ['mt-text', 'mt-focus', 'mt-inject', 'mt-hotkey']
 // 与 scripts/build-diarize.sh 的 SHERPA_VERSION 保持一致
 const SHERPA_VERSION = 'v1.13.8'
 const SHERPA_PKG = `sherpa-onnx-${SHERPA_VERSION}-win-x64-static-MT-Release-no-tts-lib`
+// 下载内容的 SHA256（换版本时一起更新）：静态库包取 GitHub Release 资源的官方摘要；c-api.h 为该 tag 的源码文件
+const SHERPA_SHA256 = 'f0aa074ddc39553b30208b53e84c12275d09702911c9faa8d34fa932428e4641'
+const C_API_SHA256 = '2a1b95084be8fd1deb3228fcad2fd3f7f0258b64582f7402281ec174c7b7f4ce'
 const sherpaDir = join(root, '.vendor', 'sherpa-onnx-win')
 const withDiarize = process.argv.includes('--diarize')
 if (withDiarize) {
@@ -67,6 +71,7 @@ function ensureSherpa() {
   const pkg = join(tmp, 'pkg.tar.bz2')
   console.log(`下载 ${SHERPA_PKG}（约 120MB）…`)
   execFileSync('curl', ['-fL', '--retry', '5', '-o', pkg, `https://github.com/k2-fsa/sherpa-onnx/releases/download/${SHERPA_VERSION}/${SHERPA_PKG}.tar.bz2`], { stdio: 'inherit' })
+  verifySha256(pkg, SHERPA_SHA256, tmp)
   execFileSync(join(process.env.SystemRoot || 'C:\\Windows', 'System32', 'tar.exe'), ['-xjf', pkg, '-C', tmp], { stdio: 'inherit' })
   rmSync(sherpaDir, { recursive: true, force: true })
   mkdirSync(sherpaDir, { recursive: true })
@@ -75,8 +80,17 @@ function ensureSherpa() {
   const header = join(sherpaDir, 'include', 'sherpa-onnx', 'c-api', 'c-api.h')
   mkdirSync(join(header, '..'), { recursive: true })
   execFileSync('curl', ['-fsSL', '--retry', '5', '-o', header, `https://raw.githubusercontent.com/k2-fsa/sherpa-onnx/${SHERPA_VERSION}/sherpa-onnx/c-api/c-api.h`], { stdio: 'inherit' })
+  verifySha256(header, C_API_SHA256, sherpaDir)
   writeFileSync(stamp, SHERPA_VERSION + '\n')
   rmSync(tmp, { recursive: true, force: true })
+}
+
+/** 下载的文件与登记的 SHA256 不符：删掉 cleanup 目录（下次重新下载）并中止，不拿来编译 */
+function verifySha256(file, expected, cleanup) {
+  const actual = createHash('sha256').update(readFileSync(file)).digest('hex')
+  if (actual === expected) return
+  rmSync(cleanup, { recursive: true, force: true })
+  throw new Error(`${file} 的 SHA256 不符：期望 ${expected}，实际 ${actual}`)
 }
 
 function findCmake() {

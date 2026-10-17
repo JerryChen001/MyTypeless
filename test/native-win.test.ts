@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
 
@@ -119,4 +119,27 @@ const skipDiarize = process.platform !== 'win32' || !existsSync(bin('mt-diarize'
 test('mt-diarize：没有任何模型参数退出码 2；模型文件不存在退出码 4', { skip: skipDiarize }, () => {
   assert.equal(run('mt-diarize', []).code, 2)
   assert.equal(run('mt-diarize', ['--denoiser', join(import.meta.dirname, '不存在 的模型.onnx')]).code, 4)
+})
+
+test('mt-hotkey：配置字符串以反斜杠结尾、或 Unicode 转义不足 4 位时判为配置错误（退出码 2），不越界读取', { skip }, () => {
+  const bs = String.fromCharCode(92) // 反斜杠
+  assert.equal(run('mt-hotkey', [`{"matches":[{"name":"a${bs}`, '--replay']).code, 2)
+  assert.equal(run('mt-hotkey', [`{"matches":[{"name":"a${bs}u12`, '--replay']).code, 2)
+  assert.equal(run('mt-hotkey', [`{"matches":[{"name":"a${bs}u12zz","key":"rctrl"}]}`, '--replay']).code, 2)
+})
+
+test('mt-hotkey：主进程的 stdin 管道关闭后立即退出（主进程崩溃时不留下全局钩子）', { skip, timeout: 15_000 }, async () => {
+  const child = spawn(bin('mt-hotkey'), [JSON.stringify({ matches: [{ name: 'dictation', key: 'rctrl' }] })], { stdio: ['pipe', 'pipe', 'ignore'] })
+  let out = ''
+  child.stdout.on('data', (d: Buffer) => (out += d))
+  const exited = new Promise<number | null>((resolve) => child.on('exit', (code) => resolve(code)))
+  for (let i = 0; i < 50 && !out.includes('"ready"') && child.exitCode === null; i++) await new Promise((r) => setTimeout(r, 100))
+  if (child.exitCode === 4) return // 没有桌面会话、装不上钩子（部分 CI 环境）
+  assert.match(out, /"phase":"ready"/)
+  const t0 = Date.now()
+  child.stdin.end()
+  const code = await Promise.race([exited, new Promise<'timeout'>((r) => setTimeout(() => r('timeout'), 3000))])
+  if (code === 'timeout') child.kill()
+  assert.notEqual(code, 'timeout', 'stdin 关闭 3 秒后助手仍在运行')
+  assert.ok(Date.now() - t0 < 1000)
 })
