@@ -39,7 +39,12 @@ run(['--build', build, '--config', 'Release', '--parallel'])
 mkdirSync(out, { recursive: true })
 // 上次替换时改名留下的旧文件：已经没有进程在用的就删掉
 for (const f of readdirSync(out)) {
-  if (/\.old-\d+\.exe$/.test(f)) rmSync(join(out, f), { force: true, maxRetries: 0 }) // 仍在运行的删不掉，忽略
+  if (!/\.old-\d+\.exe$/.test(f)) continue
+  try {
+    rmSync(join(out, f))
+  } catch {
+    /* 仍在运行，删不掉：下次再删 */
+  }
 }
 for (const name of HELPERS) {
   const dest = join(out, `${name}.exe`)

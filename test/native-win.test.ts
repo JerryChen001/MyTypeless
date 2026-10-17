@@ -36,12 +36,14 @@ test('mt-focus：输出前台应用 JSON（没有前台窗口时为 {}）', { sk
   }
 })
 
-test('mt-focus：激活不存在的进程退出码 2；参数错误 2；选区与光标上下文暂时读不到（5）', { skip }, () => {
+// --selected-text / --caret-context 会真的读当前焦点输入框（可能是用户正在用的编辑器），这里只测参数；
+// 读取本身用自建窗口端到端验证（见运行记录）
+test('mt-focus：激活不存在的进程、参数错误退出码 2', { skip }, () => {
   assert.equal(run('mt-focus', ['--activate', '4294967']).code, 2)
   assert.equal(run('mt-focus', ['--activate', 'abc']).code, 2)
   assert.equal(run('mt-focus', ['--bogus']).code, 2)
-  assert.equal(run('mt-focus', ['--selected-text']).code, 5)
-  assert.equal(run('mt-focus', ['--caret-context', '20', '20']).code, 5)
+  assert.equal(run('mt-focus', ['--caret-context', '-1', '5']).code, 2)
+  assert.equal(run('mt-focus', ['--caret-context', '0', '0']).code, 2)
 })
 
 // mt-inject 只测不会发出按键的路径；真实键入 / 粘贴 / 抓选区需要桌面，见运行记录里的隔离窗口端到端测试
