@@ -34,6 +34,7 @@ export interface PermissionStatus {
 }
 
 export interface MyTypelessBridge {
+  platform: string // process.platform：darwin / win32 …
   session: {
     start(mode?: FeatureMode): Promise<void>
     stop(): Promise<void>

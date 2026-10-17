@@ -10,8 +10,11 @@ import { initUpdate } from './update'
 /**
  * 主窗口（D-017）：左侧导航 + 页面路由（location.hash）。
  * 个人模式：首页 / 历史 / 词典；会议模式：会议（D-015）；设置两种模式共用。
+ * body[data-platform] 标出运行平台：.mac-only 的元素只在 macOS 上显示（辅助功能授权等）。
  * #home · #history · #dict · #settings · #meeting · #meeting/<会议 id>
  */
+
+document.body.dataset.platform = api.platform
 
 const PAGES = ['home', 'history', 'dict', 'settings', 'meeting'] as const
 type Page = (typeof PAGES)[number]

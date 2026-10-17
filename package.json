@@ -19,6 +19,7 @@
     "dist": "node scripts/dist.cjs",
     "release": "node scripts/publish.cjs",
     "postinstall": "electron-builder install-app-deps",
+    "setup:win": "node scripts/setup-win.cjs",
     "docs:context": "node scripts/doc-kit/context.mjs",
     "docs:check": "node scripts/doc-kit/check.mjs"
   },

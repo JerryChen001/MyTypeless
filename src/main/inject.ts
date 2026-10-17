@@ -8,7 +8,10 @@ import { injectWithHelper, helperPath } from './native'
  * 2) 原生粘贴（写剪贴板 + Cmd+V + 完整恢复剪贴板）
  * 3) osascript 粘贴（历史兜底）
  * M3: captureSelectedText —— 原生 helper 模拟 Cmd+C 抓取选中文本（剪贴板完整恢复）
+ * Windows：没有辅助功能授权；osascript 兜底只在 macOS 上有，助手缺失时写入失败，由会话把结果放进剪贴板（D-008）
  */
+
+const isMac = process.platform === 'darwin'
 
 export interface InjectResult {
   ok: boolean
@@ -21,10 +24,12 @@ const TYPE_MAX_CHARS = 160
 
 /** 辅助功能权限（mt-* 助手由本 app 派生，TCC 归属同一个 app） */
 export async function checkAccessibility(prompt = false): Promise<boolean> {
+  if (!isMac) return true
   return systemPreferences.isTrustedAccessibilityClient(prompt)
 }
 
 export async function openAccessibilitySettings(): Promise<void> {
+  if (!isMac) return
   execFile('open', ['x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility'])
 }
 
@@ -40,7 +45,7 @@ export async function captureSelectedText(): Promise<string | null> {
       })
     })
   }
-  return captureSelectedTextViaOsascript()
+  return isMac ? captureSelectedTextViaOsascript() : null
 }
 
 /** helper 缺失时的兜底：哨兵剪贴板 → osascript Cmd+C → 读回 → 恢复（仅纯文本） */
@@ -82,6 +87,7 @@ export async function injectText(text: string, method: 'auto' | 'type' | 'paste'
   const r = await injectWithHelper(text, 'paste')
   if (r.ok) return { ok: true, method: 'paste-native' }
   if (r.code === 3) return { ok: false, method: 'paste-native', error: '未授予辅助功能权限' }
+  if (!isMac) return { ok: false, method: 'paste-native', error: r.error }
   return injectTextViaPasteOsascript(text)
 }
 

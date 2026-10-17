@@ -11,6 +11,7 @@ import { builtinReady, createBuiltinAsr, prewarmBuiltin } from './whisper'
 import { LiveTranscriber, splitForTranscription } from './live'
 import { isHallucination, joinText } from './text'
 import { learnFrequentTerms, trackEdits } from './learner'
+import { pasteShortcut } from '../shared/platform'
 
 /**
  * 多模式会话状态机（M3）：
@@ -363,7 +364,7 @@ export class DictationSessionManager {
       if (!injectRes.ok) {
         // 写入失败时结果留在剪贴板，用户可以手动粘贴，内容不丢
         clipboard.writeText(finalText)
-        error = '写入失败，结果已复制到剪贴板（⌘V 粘贴）'
+        error = `写入失败，结果已复制到剪贴板（${pasteShortcut(process.platform)} 粘贴）`
       }
       this.record({ mode, rawText, finalText, durationMs, front, sourceText: sourceText ?? undefined, error: error ?? notice })
       if (injectRes.ok && (mode === 'dictation' || mode === 'rewrite')) this.learn(finalText, front, settings)

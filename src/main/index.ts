@@ -1,6 +1,7 @@
 import { app, BrowserWindow, clipboard, dialog, globalShortcut, ipcMain, Tray, Menu, nativeImage, nativeTheme, screen, shell, systemPreferences } from 'electron'
 import { execFile, execFileSync } from 'child_process'
 import { appendFileSync, writeFileSync } from 'fs'
+import { tmpdir } from 'os'
 import { join } from 'path'
 import { IPC, type SessionProgress, type Settings, type FeatureMode, type MeetingLive, type MeetingStartOptions, type MeetingTrack } from '../shared/types'
 import type { PermissionStatus } from '../shared/api'
@@ -22,6 +23,7 @@ import { MeetingManager, meetingStore } from './meeting'
 import { appAudioSupported, listAudioApps, prepareAppAudio } from './meeting/app-audio'
 import { denoiser, diarizer } from './meeting/diarizer'
 import { buildTranscript, exportMarkdown } from './meeting/minutes'
+import { comboKeys } from '../shared/platform'
 
 /**
  * MyTypeless 主进程入口
@@ -42,12 +44,14 @@ let hotkeys: HotkeyController
 let escRegistered = false
 
 const isDev = !!process.env.ELECTRON_RENDERER_URL
+const isMac = process.platform === 'darwin'
+const DEVLOG_PATH = isMac ? '/tmp/mytypeless-main.log' : join(tmpdir(), 'mytypeless-main.log')
 
 /** dev 诊断直写文件（stdout 缓冲不可靠） */
 export function devlog(...parts: unknown[]): void {
   if (!isDev) return
   try {
-    appendFileSync('/tmp/mytypeless-main.log', `[${new Date().toISOString()}] ${parts.map((p) => (typeof p === 'string' ? p : JSON.stringify(p))).join(' ')}\n`)
+    appendFileSync(DEVLOG_PATH,`[${new Date().toISOString()}] ${parts.map((p) => (typeof p === 'string' ? p : JSON.stringify(p))).join(' ')}\n`)
   } catch {
     /* noop */
   }
@@ -91,7 +95,7 @@ function createFloatingBar(): BrowserWindow {
     minimizable: false,
     maximizable: false,
     // macOS 面板窗口（非激活 NSPanel）：能浮在全屏应用上方，且不需要把整个应用变成后台辅助应用
-    type: 'panel',
+    ...(isMac ? { type: 'panel' } : {}),
     focusable: false, // 永不抢焦点：注入目标始终是用户正在用的 app
     acceptFirstMouse: true, // 非焦点窗口上的 ✓/✕ 第一次点击即生效
     hiddenInMissionControl: true,
@@ -133,6 +137,12 @@ function showFloatingBar(): void {
   win.showInactive()
 }
 
+/** Windows 标题栏按钮（最小化 / 最大化 / 关闭）的底色与图标色，跟随主窗口的 --bg / --fg */
+function hubTitleBarOverlay(): Electron.TitleBarOverlay {
+  const dark = nativeTheme.shouldUseDarkColors
+  return { color: dark ? '#1c1c1e' : '#f7f7f5', symbolColor: dark ? '#f2f2f4' : '#1d1d1f', height: 36 }
+}
+
 function createHub(): BrowserWindow {
   const win = new BrowserWindow({
     width: 1000,
@@ -142,10 +152,17 @@ function createHub(): BrowserWindow {
     show: false,
     title: 'MyTypeless',
     backgroundColor: nativeTheme.shouldUseDarkColors ? '#1c1c1e' : '#f7f7f5',
-    titleBarStyle: 'hiddenInset',
-    trafficLightPosition: { x: 18, y: 18 },
+    // 界面自带拖动区（.sidebar-drag / .content-drag）：macOS 保留红绿灯，Windows 用系统绘制的标题栏按钮
+    ...(isMac
+      ? { titleBarStyle: 'hiddenInset' as const, trafficLightPosition: { x: 18, y: 18 } }
+      : { titleBarStyle: 'hidden' as const, titleBarOverlay: hubTitleBarOverlay() }),
     webPreferences: { preload, contextIsolation: true, nodeIntegration: false }
   })
+  if (!isMac) {
+    const syncOverlay = () => !win.isDestroyed() && win.setTitleBarOverlay(hubTitleBarOverlay())
+    nativeTheme.on('updated', syncOverlay)
+    win.on('closed', () => nativeTheme.off('updated', syncOverlay))
+  }
   attachRendererDiagnostics(win, 'hub')
   loadRenderer(win, 'hub')
   win.on('closed', () => (hub = null))
@@ -206,16 +223,38 @@ function showHub(anchor?: string): void {
   }
 }
 
-function createTray(): void {
+/** 托盘图标的强调色（主窗口浅色 --accent #2f6bff） */
+const TRAY_TINT = { r: 0x2f, g: 0x6b, b: 0xff }
+
+function trayImage(): Electron.NativeImage {
   const img = nativeImage.createFromBuffer(Buffer.from(TRAY_ICON_2X_BASE64, 'base64'), { scaleFactor: 2 })
-  img.setTemplateImage(true)
-  tray = new Tray(img)
+  if (isMac) {
+    img.setTemplateImage(true)
+    return img
+  }
+  // 其他平台不会给模板图反色（黑图在深色任务栏上看不见）：保留轮廓的透明度，涂成强调色
+  const { width, height } = img.getSize() // 逻辑尺寸；位图是 @2x 像素
+  const px = img.toBitmap({ scaleFactor: 2 }) // BGRA，预乘透明度
+  for (let i = 0; i < px.length; i += 4) {
+    const a = px[i + 3]
+    px[i] = Math.round((TRAY_TINT.b * a) / 255)
+    px[i + 1] = Math.round((TRAY_TINT.g * a) / 255)
+    px[i + 2] = Math.round((TRAY_TINT.r * a) / 255)
+  }
+  return nativeImage.createFromBitmap(px, { width: width * 2, height: height * 2, scaleFactor: 2 })
+}
+
+function createTray(): void {
+  tray = new Tray(trayImage())
   tray.setToolTip('MyTypeless')
+  // Windows / Linux：单击托盘图标打开主窗口（macOS 单击即弹菜单）
+  if (!isMac) tray.on('click', () => showHub())
   rebuildTrayMenu()
 }
 
-/** "opt+space" → "⌥Space" */
+/** "opt+space" → "⌥Space"；Windows："rctrl+space" → "右Ctrl+空格" */
 function prettyCombo(combo: string): string {
+  if (!isMac) return comboKeys(combo, process.platform).join('+')
   const sym: Record<string, string> = { opt: '⌥', option: '⌥', alt: '⌥', cmd: '⌘', command: '⌘', ctrl: '⌃', control: '⌃', shift: '⇧', fn: 'fn ' }
   return combo
     .split('+')
@@ -381,7 +420,7 @@ let permissionHostCache: string | undefined | null = null
  * 而不是 Electron 或 MyTypeless。沿父进程链找到第一个 .app，提示用户给它授权。
  */
 function permissionHost(): string | undefined {
-  if (app.isPackaged) return undefined
+  if (app.isPackaged || !isMac) return undefined // 只有 macOS 的隐私权限（TCC）归属于负责进程
   if (permissionHostCache !== null) return permissionHostCache
   permissionHostCache = undefined
   let pid = process.ppid
@@ -408,6 +447,7 @@ function permissionHost(): string | undefined {
  * AppleFnUsageType：0 无操作，1 切换输入法，2 表情与符号，3 开始听写；未设置 = 系统默认（非无操作）。
  */
 function fnKeyConflict(): boolean {
+  if (!isMac) return false
   const s = loadSettings()
   const usesFn = [s.bindings?.dictation, s.bindings?.ask, s.bindings?.translate, s.bindings?.rewrite].some((c) => /(^|\+)fn(\+|$)/i.test(c ?? ''))
   if (!usesFn) return false
@@ -592,6 +632,7 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.checkPermissions, () => permissionStatus())
   ipcMain.handle(IPC.resetAccessibility, async () => {
+    if (!isMac) return false
     // 只清除本应用（按 bundle id）的辅助功能记录：旧版本签名不同，系统里开关看着是开的但对新版本无效
     const ok = await new Promise<boolean>((resolve) => {
       execFile('tccutil', ['reset', 'Accessibility', 'com.mytypeless.desktop'], (err) => resolve(!err))
@@ -601,7 +642,7 @@ function registerIpc(): void {
     return ok
   })
   ipcMain.handle(IPC.openKeyboardSettings, () => {
-    void shell.openExternal('x-apple.systempreferences:com.apple.Keyboard-Settings.extension')
+    if (isMac) void shell.openExternal('x-apple.systempreferences:com.apple.Keyboard-Settings.extension')
   })
   ipcMain.on(IPC.barInteractive, (_e, interactive: boolean) => {
     floatingBar?.setIgnoreMouseEvents(!interactive, { forward: true })
@@ -682,7 +723,8 @@ if (!gotLock) {
       devlog('setup incomplete, showing hub')
       showHub()
     }
-    if (systemPreferences.getMediaAccessStatus('microphone') === 'not-determined') {
+    // askForMediaAccess 只有 macOS 有；Windows 由系统设置统一控制桌面应用的麦克风访问
+    if (isMac && systemPreferences.getMediaAccessStatus('microphone') === 'not-determined') {
       void systemPreferences.askForMediaAccess('microphone')
     }
 

@@ -1,4 +1,5 @@
 import type { MeetingLive, SessionProgress } from '../../shared/types'
+import { micPermissionHint } from '../../shared/platform'
 
 /**
  * 浮动条渲染端（事件驱动版）：
@@ -313,7 +314,7 @@ async function startCapture(): Promise<void> {
     const name = err instanceof DOMException ? err.name : ''
     showError(
       name === 'NotAllowedError'
-        ? '没有麦克风权限：系统设置 → 隐私与安全性 → 麦克风 → 允许 MyTypeless'
+        ? micPermissionHint(api.platform)
         : '无法访问麦克风：' + (err instanceof Error ? err.message : String(err))
     )
     void api.session.cancel()
@@ -367,7 +368,7 @@ async function startMeetingCapture(deviceId: string): Promise<void> {
     meetingCapturing = false
     releaseMic()
     const name = err instanceof DOMException ? err.name : ''
-    showError(name === 'NotAllowedError' ? '没有麦克风权限：系统设置 → 隐私与安全性 → 麦克风 → 允许 MyTypeless' : '无法访问麦克风，会议已暂停')
+    showError(name === 'NotAllowedError' ? micPermissionHint(api.platform) : '无法访问麦克风，会议已暂停')
     void api.meeting.pause()
   }
 }
