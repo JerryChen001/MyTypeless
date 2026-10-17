@@ -35,6 +35,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci --ignore-scripts
+      - run: npm run native:win
       - run: npm run typecheck
       - run: npm run test
       - run: npm run build
