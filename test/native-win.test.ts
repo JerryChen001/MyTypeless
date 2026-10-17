@@ -143,3 +143,53 @@ test('mt-hotkey：主进程的 stdin 管道关闭后立即退出（主进程崩�
   assert.notEqual(code, 'timeout', 'stdin 关闭 3 秒后助手仍在运行')
   assert.ok(Date.now() - t0 < 1000)
 })
+
+// mt-whisper（npm run whisper:win）：用 whisper.cpp 自带的测试模型（随机权重，只验证能加载、能起服务）
+const testModel = join(import.meta.dirname, '..', '.vendor', 'whisper.cpp', 'models', 'for-tests-ggml-tiny.bin')
+const skipWhisper = process.platform !== 'win32' || !existsSync(bin('mt-whisper')) || !existsSync(testModel) ? '需要 Windows 与 npm run whisper:win' : false
+
+test('mt-whisper：加载模型后 /health 就绪（与主进程相同的启动参数）', { skip: skipWhisper, timeout: 90_000 }, async () => {
+  const port = 20000 + Math.floor(Math.random() * 20000)
+  const child = spawn(bin('mt-whisper'), ['-m', testModel, '--host', '127.0.0.1', '--port', String(port), '-t', '2', '-l', 'auto'], { stdio: 'ignore' })
+  try {
+    let ok = false
+    for (let i = 0; i < 600 && !ok && child.exitCode === null; i++) {
+      await new Promise((r) => setTimeout(r, 100))
+      ok = await fetch(`http://127.0.0.1:${port}/health`).then((r) => r.ok, () => false)
+    }
+    assert.ok(ok, `引擎没有就绪（退出码 ${child.exitCode}）`)
+  } finally {
+    child.kill()
+  }
+})
+
+// mt-audiotap（线上会议截取应用声音，D-033）：只测不依赖播放声音的部分；真实截取见运行记录里的端到端测试
+test('mt-audiotap：--apps / --list 输出 JSON 数组；参数错误退出码 2', { skip }, () => {
+  for (const arg of ['--apps', '--list']) {
+    const r = run('mt-audiotap', [arg])
+    assert.equal(r.code, 0)
+    const list = JSON.parse(r.out) as Array<{ bundleId: string; name: string }>
+    assert.ok(Array.isArray(list))
+    for (const a of list) assert.match(a.bundleId, /^[^A-Z]+$/) // 小写 exe 文件名
+  }
+  assert.equal(run('mt-audiotap', ['--bogus']).code, 2)
+})
+
+test('mt-audiotap：截取不存在的应用——就绪后按真实时间输出 16kHz 静音', { skip, timeout: 20_000 }, async () => {
+  const child = spawn(bin('mt-audiotap'), ['--bundle', 'no-such-app.exe'], { stdio: ['ignore', 'pipe', 'pipe'] })
+  let err = ''
+  const chunks: Buffer[] = []
+  child.stderr.on('data', (d: Buffer) => (err += d))
+  try {
+    for (let i = 0; i < 50 && !err.includes('"ready"') && child.exitCode === null; i++) await new Promise((r) => setTimeout(r, 100))
+    if (child.exitCode === 4) return // 低于 Windows 10 build 20348（CI 机器可能不支持进程回环录音）
+    assert.match(err, /"ready":true/)
+    child.stdout.on('data', (d: Buffer) => chunks.push(d))
+    await new Promise((r) => setTimeout(r, 1000))
+    const bytes = Buffer.concat(chunks)
+    assert.ok(bytes.length > 16000 * 2 * 0.7 && bytes.length < 16000 * 2 * 1.3, `1 秒输出了 ${bytes.length} 字节`)
+    assert.ok(bytes.every((b) => b === 0))
+  } finally {
+    child.kill()
+  }
+})
