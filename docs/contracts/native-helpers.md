@@ -90,3 +90,14 @@ whisper.cpp（MIT）`whisper-server` 的静态编译版，由 `scripts/build-whi
 两个读文字的用法找焦点元素时先问系统焦点；问不到（Electron / Chromium 应用默认不公开辅助功能树，返回 -25204）时改问前台应用自己的焦点元素，仍问不到则对该应用设置 `AXManualAccessibility = true`（Electron 提供的开关，让它建立辅助功能树）后再问一次。读到的仍只是光标附近这一段 / 选中的文字。
 
 前两个用法不需要辅助功能权限。
+
+## Windows 版（GAP-008）
+
+源码在 `native/win/`（C++ + Win32，原创），`npm run native:win`（`scripts/build-native-win.cjs`，CMake + MSVC，静态链接运行库）编译到 `native/bin/mt-*.exe`。参数、输出与退出码同上；Windows 没有辅助功能授权，不会返回 3。与 macOS 的差异：
+
+| 助手 | 状态 | 差异 |
+| --- | --- | --- |
+| `mt-text` | 已实现 | 系统 `LCMapStringEx`（`LCMAP_SIMPLIFIED_CHINESE` / `LCMAP_TRADITIONAL_CHINESE`），逐字转换，与 ICU `Hant-Hans` 一样不做词语转换 |
+| `mt-focus` | 前台应用、`--activate` 已实现 | `bundleId` 为小写 exe 文件名（如 `code.exe`），`name` 为程序的文件描述（没有时用 exe 文件名）；UWP 应用跳过外壳 `ApplicationFrameHost.exe` 取里面的应用；`--activate` 用 `AttachThreadInput` 绕过前台锁，切换后前台不是目标窗口时退出码 4。`--selected-text`、`--caret-context` 尚未实现，一律退出码 5（读不到） |
+| `mt-inject`、`mt-hotkey`、`mt-whisper`、`mt-diarize` | 未实现 | 缺失时主进程按原有降级处理（快捷键走 `globalShortcut`，写入失败放进剪贴板） |
+
