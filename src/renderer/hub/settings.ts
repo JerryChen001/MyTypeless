@@ -1,5 +1,6 @@
 import type { AsrProviderConfig, MeetingLive, ModelInfo, ModelProgress, Settings } from '../../shared/types'
 import { $, api } from './util'
+import { defaultBindings } from '../../shared/platform'
 
 // 设置页：识别/润色配置、模型下载、快捷键、麦克风；首页的模型横幅与权限状态也在这里维护
 
@@ -17,6 +18,10 @@ export function currentSettings(): Settings | null {
 
 export async function loadSettingsIntoUi(): Promise<void> {
   const s = await api.settings.get()
+  const defaults = defaultBindings(api.platform).bindings
+  ;($('bind-dictation') as HTMLInputElement).placeholder = defaults.dictation
+  ;($('bind-ask') as HTMLInputElement).placeholder = defaults.ask
+  ;($('bind-translate') as HTMLInputElement).placeholder = defaults.translate
   savedSettings = s
   ;($('asr-provider') as HTMLSelectElement).value = s.asr.provider
   ;($('asr-language') as HTMLSelectElement).value = s.asr.language ?? 'system'
@@ -272,7 +277,7 @@ $('btn-asr-health').addEventListener('click', async () => {
 })
 
 $('btn-save').addEventListener('click', async () => {
-  const hotkeyKey = ($('bind-dictation') as HTMLInputElement).value.trim() || 'fn'
+  const hotkeyKey = ($('bind-dictation') as HTMLInputElement).value.trim() || defaultBindings(api.platform).hotkeyKey
   const provider = ($('asr-provider') as HTMLSelectElement).value as AsrProviderConfig['provider']
   const localUrl = ($('asr-local-url') as HTMLInputElement).value.trim() || 'http://127.0.0.1:8178'
   const toAccel = (combo: string) =>

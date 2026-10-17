@@ -17,7 +17,7 @@
 调用：`mt-hotkey '<json>'`，`json = {"matches":[{"name":"dictation","key":"space","require":["opt"]}]}`。
 
 - `key`：字母、数字、标点、`space`/`return`/`tab`/`escape`/`delete`、`f1`～`f20`、方向键与翻页键；单修饰键 `fn`、`ropt`/`lopt`、`rcmd`/`lcmd`、`rshift`/`lshift`、`rctrl`/`lctrl`；`shift` 只用于 `fn+shift`（左右 Shift 都算）。未知键写 stderr `unknown key: <key>` 并跳过。
-- `require`：`opt`、`cmd`、`ctrl`、`shift`、`fn`。四个主修饰键**精确匹配**（多按了其他修饰键不触发）。
+- `require`：`opt`、`cmd`、`ctrl`、`shift`、`fn`。四个主修饰键**精确匹配**（多按了其他修饰键不触发）。Windows 版还支持区分左右的 `rctrl`、`lctrl`、`ropt`、`lopt`、`rshift`、`lshift`、`rcmd`、`lcmd`（该侧必须按着，同时算作对应的通用修饰键；macOS 版暂不支持，会忽略）。
 - stdout 每行一个 JSON 事件：`{"name":"system","phase":"ready"}`（tap 就绪）；`{"name":<绑定名>,"phase":"down"|"up"|"abort"}`。
 - `abort` 只用于单修饰键触发（如 `fn`）：按住期间按了其他键。若该键与 fn 组成另一条注册组合（`fn+space` 的空格、`fn+shift` 的 Shift），先发当前绑定的 `abort`、再发那条组合的 `down`，组合键被吞掉；否则只发 `abort`，按键照常传给系统（如 Fn+方向键）。
 - 命中的触发键被吞掉（包括按住时的自动重复）；单修饰键事件不吞。
@@ -100,5 +100,6 @@ whisper.cpp（MIT）`whisper-server` 的静态编译版，由 `scripts/build-whi
 | `mt-text` | 已实现 | 系统 `LCMapStringEx`（`LCMAP_SIMPLIFIED_CHINESE` / `LCMAP_TRADITIONAL_CHINESE`），逐字转换，与 ICU `Hant-Hans` 一样不做词语转换 |
 | `mt-focus` | 前台应用、`--activate` 已实现 | `bundleId` 为小写 exe 文件名（如 `code.exe`），`name` 为程序的文件描述（没有时用 exe 文件名）；UWP 应用跳过外壳 `ApplicationFrameHost.exe` 取里面的应用；`--activate` 用 `AttachThreadInput` 绕过前台锁，切换后前台不是目标窗口时退出码 4。`--selected-text`、`--caret-context` 尚未实现，一律退出码 5（读不到） |
 | `mt-inject` | 已实现 | `SendInput` 的 Unicode 键盘事件键入（16 个 UTF-16 单元一块，不拆开代理项对；换行发回车键）；键入 / 组合键前先松开仍按着的修饰键（Alt / Win 前插一个未分配的键，避免激活菜单栏 / 开始菜单）；粘贴为 Ctrl+V，`--combo` 的 `cmd` 按 Ctrl 处理；剪贴板备份恢复全部内存格式与增强图元文件，用剪贴板序列号判断是否被他人改过；写入剪贴板的临时内容与恢复的备份都带 `ExcludeClipboardContentFromMonitorProcessing`、`CanIncludeInClipboardHistory=0`、`CanUploadToCloudClipboard=0`（不进剪贴板历史与云剪贴板）。`--copy-selection` 由目标应用执行复制，那一份会进入剪贴板历史（无法标记）。被 UIPI 拦截（目标是管理员权限窗口）时系统不报错，键入会静默丢失 |
-| `mt-hotkey`、`mt-whisper`、`mt-diarize` | 未实现 | 缺失时主进程按原有降级处理（快捷键走 `globalShortcut`，写入失败放进剪贴板） |
+| `mt-hotkey` | 已实现 | 低级键盘钩子（`WH_KEYBOARD_LL`）；忽略程序模拟的按键（`LLKHF_INJECTED`，含 `mt-inject` 的键入）；`fn` 读不到，写 stderr `unknown key: fn` 后跳过（没有有效绑定时退出码 2，主进程退回 `globalShortcut`）；`opt` = Alt、`cmd` = Win；修饰键组合（`rctrl+shift`）的第二个修饰键按下与抬起成对吞掉（Windows 默认 Ctrl+Shift 切换键盘布局）；父进程退出后立即退出；安装钩子失败退出码 4。测试用 `mt-hotkey '<json>' --replay`：不安装钩子，从 stdin 逐行读 `<键名> down|up`，输出同样的事件，被吞的按键另输出 `{"swallowed":"<行>"}`。目标是管理员权限窗口时收不到按键（UIPI） |
+| `mt-whisper`、`mt-diarize` | 未实现 | 缺失时主进程按原有降级处理（快捷键走 `globalShortcut`，写入失败放进剪贴板） |
 

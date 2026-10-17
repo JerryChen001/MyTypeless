@@ -52,3 +52,48 @@ test('mt-inject：参数错误、非法 base64、不支持的组合键退出码 
   assert.equal(run('mt-inject', ['--combo', 'ctrl+f13']).code, 2)
   assert.equal(run('mt-inject', ['--combo', 'hyper+c']).code, 2)
 })
+
+// mt-hotkey 的状态机用 --replay 测（不安装钩子）：物理按键无法由程序模拟，钩子本身需要真机验收
+const HOTKEY_CFG = JSON.stringify({
+  matches: [
+    { name: 'dictation', key: 'rctrl' },
+    { name: 'ask', key: 'space', require: ['rctrl'] },
+    { name: 'translate', key: 'shift', require: ['rctrl'] }
+  ]
+})
+const replay = (keys: string) =>
+  run('mt-hotkey', [HOTKEY_CFG, '--replay'], keys)
+    .out.trim()
+    .split('\n')
+    .filter(Boolean)
+    .map((l) => {
+      const j = JSON.parse(l) as { name?: string; phase?: string; swallowed?: string }
+      return j.swallowed ? `吞:${j.swallowed}` : `${j.name}:${j.phase}`
+    })
+
+test('mt-hotkey：按住右 Ctrl 说话，自动重复不重复触发，右 Ctrl 本身不吞', { skip }, () => {
+  assert.deepEqual(replay('rctrl down\nrctrl down\nrctrl up\n'), ['dictation:down', 'dictation:up'])
+})
+
+test('mt-hotkey：右 Ctrl+空格 切到提问，空格（含重复）被吞', { skip }, () => {
+  assert.deepEqual(replay('rctrl down\nspace down\nspace down\nspace up\nrctrl up\n'), [
+    'dictation:down', 'dictation:abort', 'ask:down', '吞:space down', '吞:space down', 'ask:up', '吞:space up'
+  ])
+})
+
+test('mt-hotkey：右 Ctrl+Shift 切到翻译，Shift 按下与抬起成对被吞（避免切换键盘布局）', { skip }, () => {
+  assert.deepEqual(replay('rctrl down\nrshift down\nrshift up\nrctrl up\n'), [
+    'dictation:down', 'dictation:abort', 'translate:down', '吞:rshift down', 'translate:up', '吞:rshift up'
+  ])
+})
+
+test('mt-hotkey：右 Ctrl+其他键 = 普通组合键，abort 并放行；左 Ctrl+空格、单独 Shift 不触发', { skip }, () => {
+  assert.deepEqual(replay('rctrl down\nc down\nc up\nrctrl up\n'), ['dictation:down', 'dictation:abort'])
+  assert.deepEqual(replay('lctrl down\nspace down\nspace up\nlctrl up\nlshift down\nlshift up\n'), [])
+})
+
+test('mt-hotkey：先按着别的修饰键再按右 Ctrl 不触发；配置错误或只有 fn 时退出码 2', { skip }, () => {
+  assert.deepEqual(replay('lshift down\nrctrl down\nrctrl up\nlshift up\n'), [])
+  assert.equal(run('mt-hotkey', ['not json', '--replay']).code, 2)
+  assert.equal(run('mt-hotkey', [JSON.stringify({ matches: [{ name: 'dictation', key: 'fn' }] }), '--replay']).code, 2)
+})

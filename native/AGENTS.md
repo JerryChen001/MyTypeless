@@ -11,14 +11,14 @@
 | `diarize-helper.c` → `bin/mt-diarize` | 会议声纹（D-015）：常驻，按行读命令，从会议临时录音取一段算声音特征；静态链接 sherpa-onnx / ONNX Runtime，由 `scripts/build-diarize.sh` 编译 |
 | `focus-helper.swift` → `bin/mt-focus` | 前台应用信息（bundleId、名称、pid），以及按 pid 激活应用 |
 | `audiotap-helper.swift` → `bin/mt-audiotap` | 线上会议截取会议软件播放的声音（Core Audio process tap，macOS 14.2+，D-033）：stdout 连续输出 16kHz 单声道 s16le；`--apps` 列应用、`--probe` 开会前完成授权 |
-| `win/` → `bin/mt-*.exe` | Windows 版助手（C++ + Win32，GAP-008）：`text-helper.cpp`、`focus-helper.cpp`、`inject-helper.cpp`，共用 `common.h`（UTF-8 转换、二进制 stdin/stdout、base64、JSON 转义）；`CMakeLists.txt` 由 `npm run native:win` 调用 |
+| `win/` → `bin/mt-*.exe` | Windows 版助手（C++ + Win32，GAP-008）：`text-helper.cpp`、`focus-helper.cpp`、`inject-helper.cpp`、`hotkey-helper.cpp`，共用 `common.h`（UTF-8 转换、二进制 stdin/stdout、base64、JSON 转义）；`CMakeLists.txt` 由 `npm run native:win` 调用 |
 | `bin/` | 编译产物（gitignore），打包时经 `extraResources` 放到 `Resources/bin/` |
 
 参数、输出和退出码以 [原生助手契约](../docs/contracts/native-helpers.md) 为准，改协议时先改契约，再同步 `src/main/native.ts`。
 
 ## 可复制范例
 
-- 新增按键名：在 `hotkey-helper.swift` 的 `keyTable` 加映射（kVK 键码），单修饰键还要加 `modifierDeviceMask`。
+- 新增按键名：在 `hotkey-helper.swift` 的 `keyTable` 加映射（kVK 键码），单修饰键还要加 `modifierDeviceMask`；Windows 在 `hotkey-helper.cpp` 的 `NormalKey` / `kModifierKeys` 加虚拟键码，并在 `test/native-win.test.ts` 用 `--replay` 补场景。
 - 新增 `mt-inject` 子命令：照 `--copy-selection`（参数解析 → 权限检查后的独立函数 `copySelectedText` → 退出码）。
 - 剪贴板临时占用：用 `snapshotPasteboard` 备份全部类型，恢复前检查 `changeCount` 是否被他人改过。Windows 照 `inject-helper.cpp` 的 `SnapshotClipboard` / `RestoreClipboard`（序列号判断），写入时调用 `MarkPrivate` 排除出剪贴板历史。
 

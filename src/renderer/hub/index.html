@@ -66,7 +66,7 @@
           <header class="page-head">
             <div>
               <h1 id="home-greeting">你好</h1>
-              <p class="sub">在任意输入框按住 <kbd>fn</kbd> 说话，松开即写入</p>
+              <p class="sub">在任意输入框按住 <span class="main-key"><kbd>fn</kbd></span> 说话，松开即写入</p>
             </div>
           </header>
 
@@ -187,7 +187,7 @@
                 <select id="meeting-remote" title="会议软件里有几个人说话（会中、会后都能再改）"></select>
               </div>
               <div class="hint" id="meeting-source-hint"></div>
-              <div class="hint">选好人数（会中、会后都能再改），说话人按这个人数和声音区分，之后随时可以改名。录音前请告知参会者正在录音转写；录音只在本机临时保存，整理完自动删除。会议进行中 Fn 听写暂停。</div>
+              <div class="hint">选好人数（会中、会后都能再改），说话人按这个人数和声音区分，之后随时可以改名。录音前请告知参会者正在录音转写；录音只在本机临时保存，整理完自动删除。会议进行中 <span class="main-key">Fn</span> 听写暂停。</div>
               <div class="hint" id="meeting-start-state"></div>
             </div>
             <div id="meeting-list" class="meeting-list"></div>
@@ -297,7 +297,8 @@
                   <option>Español</option>
                 </select>
               </label>
-              <div class="hint">格式如 <kbd>fn</kbd>、<kbd>fn+space</kbd>、<kbd>ropt</kbd>（右 Option）、<kbd>opt+space</kbd>；提问/翻译按一下开始，再按一下或按主键结束。外接键盘的 Fn 系统读不到时，可改用 <kbd>ropt</kbd></div>
+              <div class="hint mac-only">格式如 <kbd>fn</kbd>、<kbd>fn+space</kbd>、<kbd>ropt</kbd>（右 Option）、<kbd>opt+space</kbd>；提问/翻译按一下开始，再按一下或按主键结束。外接键盘的 Fn 系统读不到时，可改用 <kbd>ropt</kbd></div>
+              <div class="hint non-mac">格式如 <kbd>rctrl</kbd>（右 Ctrl）、<kbd>rctrl+space</kbd>、<kbd>ralt</kbd>（右 Alt）、<kbd>alt+space</kbd>；提问/翻译按一下开始，再按一下或按主键结束。Windows 键盘的 Fn 系统读不到，不能用作快捷键</div>
             </div>
           </div>
 

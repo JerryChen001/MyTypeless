@@ -16,7 +16,7 @@ const root = join(__dirname, '..')
 const src = join(root, 'native', 'win')
 const build = join(root, '.vendor', 'native-win-build')
 const out = join(root, 'native', 'bin')
-const HELPERS = ['mt-text', 'mt-focus', 'mt-inject']
+const HELPERS = ['mt-text', 'mt-focus', 'mt-inject', 'mt-hotkey']
 
 const cmake = findCmake()
 const run = (args) => execFileSync(cmake, args, { stdio: 'inherit' })

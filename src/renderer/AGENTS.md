@@ -28,7 +28,7 @@
 - 麦克风：设置指定优先；“自动”跳过虚拟输入设备（优先内置麦克风）；开麦 0.6 秒内全是纯零则自动换到下一个真实麦克风并提示；设备插拔后重新选择。
 - 会话结束后按设置立即释放或保持就绪 60 秒（D-011）；AudioContext 与 worklet 模块可以常驻。
 - 用户文本不得直接拼进 `innerHTML`。
-- 快捷键名、系统设置路径按 `api.platform` 显示（`src/shared/platform.ts`）；只在 macOS 有意义的元素（辅助功能授权等）加 `mac-only` 类。
+- 快捷键名、系统设置路径按 `api.platform` 显示（`src/shared/platform.ts`）；只在 macOS 有意义的元素（辅助功能授权等）加 `mac-only` 类，只在其他平台显示的加 `non-mac`；页面里写死的主键名放进 `.main-key`（非 macOS 由 `renderShortcuts` 换成实际主键）。
 
 ## 依赖与影响面
 

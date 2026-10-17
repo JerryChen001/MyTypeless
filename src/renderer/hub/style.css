@@ -34,6 +34,7 @@
 * { margin: 0; padding: 0; box-sizing: border-box; }
 html, body { height: 100%; }
 body:not([data-platform='darwin']) .mac-only { display: none !important; }
+body[data-platform='darwin'] .non-mac { display: none !important; }
 body {
   font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
   font-size: 13px;
