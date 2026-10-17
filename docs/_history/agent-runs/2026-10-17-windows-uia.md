@@ -20,5 +20,5 @@ GAP-008：Windows 版 `mt-focus --selected-text` / `--caret-context`。有了它
 ## 遗留
 
 - 每个 Chromium / Electron 应用第一次读选区会落空（唤醒前已获得焦点的输入框，要等光标动一次 Chromium 才报告焦点）。
-- Notepad++（Scintilla）两种方式都读不到：听写时选中即改写不可用，单独绑定的改写键（Ctrl+C 抓选区）可用。
+- Notepad++（Scintilla）两种方式都读不到；VS Code 编辑器在未开启屏幕阅读器优化模式时不对辅助功能公开内容（用临时用户数据目录的独立实例实测：焦点元素 `native-edit-context`，选区为空，上下文是读屏提示语；macOS 版同理）。这两类程序里听写时选中即改写不可用，主键会按普通听写覆盖选中内容；单独绑定的改写键（Ctrl+C 抓选区）可用。用户决定保持现状（不在主键上退回 Ctrl+C），设置页说明已写明。
 - 端到端测试脚本在本地（需要桌面环境），未入库。

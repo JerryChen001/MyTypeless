@@ -22,6 +22,8 @@ export async function loadSettingsIntoUi(): Promise<void> {
   ;($('bind-dictation') as HTMLInputElement).placeholder = defaults.dictation
   ;($('bind-ask') as HTMLInputElement).placeholder = defaults.ask
   ;($('bind-translate') as HTMLInputElement).placeholder = defaults.translate
+  // Windows 上有的程序（VS Code 编辑器、Notepad++）读不到选区，主键会按普通听写覆盖选中内容，需要单独的改写键
+  if (api.platform !== 'darwin') ($('bind-rewrite') as HTMLInputElement).placeholder = '留空：选中文字后按主键即可（VS Code、Notepad++ 等读不到选区的程序除外）'
   savedSettings = s
   ;($('asr-provider') as HTMLSelectElement).value = s.asr.provider
   ;($('asr-language') as HTMLSelectElement).value = s.asr.language ?? 'system'
