@@ -119,9 +119,9 @@ static int Activate(DWORD pid) {
   DWORD fgThread = fg ? GetWindowThreadProcessId(fg, nullptr) : 0;
   DWORD self = GetCurrentThreadId();
   bool attached = fgThread && fgThread != self && AttachThreadInput(self, fgThread, TRUE);
+  // 不要 SetFocus(target)：那会把焦点从窗口里的输入框移到窗口本身；SetForegroundWindow 会恢复原来的焦点控件
   SetForegroundWindow(target);
   BringWindowToTop(target);
-  SetFocus(target);
   if (attached) AttachThreadInput(self, fgThread, FALSE);
   return GetForegroundWindow() == target ? 0 : 4;
 }
