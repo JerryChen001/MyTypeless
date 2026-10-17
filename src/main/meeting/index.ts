@@ -24,7 +24,7 @@ import {
   type ClusterItem,
   type VoicedPart
 } from './cluster'
-import { AppAudioCapture, appAudioSupported, prepareAppAudio, type AppAudioEvent } from './app-audio'
+import { AppAudioCapture, appAudioSupported, appAudioUnsupportedHint, prepareAppAudio, type AppAudioEvent } from './app-audio'
 import { denoiser, diarizer, speakerModel } from './diarizer'
 import { ECHO_AHEAD_FRAMES, ECHO_LEAD_FRAMES, removeEcho } from './echo'
 import { normalizeLoudness } from './enhance'
@@ -183,7 +183,7 @@ export class MeetingManager {
     if (this.processing) return { ok: false, error: '上一场会议还在整理中，请稍候' }
     const settings = loadSettings()
     const source: MeetingSource = opts.source ?? settings.meetingSource ?? 'mic'
-    if (source !== 'mic' && !appAudioSupported()) return { ok: false, error: '截取会议软件的声音需要 macOS 14.2 或更新版本；可以改为只用麦克风' }
+    if (source !== 'mic' && !appAudioSupported()) return { ok: false, error: `${appAudioUnsupportedHint()}；可以改为只用麦克风` }
     // 先完成「录制系统音频」授权（允许后系统会重新打开 MyTypeless，不能等到会议中途）
     if (source !== 'mic' && (await prepareAppAudio()) === 'waiting') {
       return { ok: false, error: '请先在系统弹出的对话框里允许 MyTypeless 录制系统音频（允许后 MyTypeless 会自动重新打开），然后再开始会议' }

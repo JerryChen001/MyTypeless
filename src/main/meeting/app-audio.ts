@@ -15,8 +15,9 @@ const READY_HINT_MS = 3000
 const SILENT_HINT_MS = 60_000
 const MAX_RESTARTS = 5
 
-/** Process tap 需要 macOS 14.2+ */
+/** Process tap 需要 macOS 14.2+；其他平台还没有截取应用声音的助手（GAP-008） */
 export function appAudioSupported(): boolean {
+  if (process.platform !== 'darwin') return false
   const [major, minor] = process.getSystemVersion().split('.').map(Number)
   return (major > 14 || (major === 14 && minor >= 2)) && !!helperPath('mt-audiotap')
 }
@@ -75,6 +76,11 @@ let probing: Promise<boolean> | null = null
  * 必须在会议开始前完成，否则会议被打断。授权框还没回应时返回 'waiting'（探测进程留着，授权框不消失）。
  * 用户拒绝过时系统不再询问、只给静音：仍返回 'ready'，由会议中“一直是静音”的提示引导去系统设置。
  */
+/** 不能截取会议软件声音时给用户的说明 */
+export function appAudioUnsupportedHint(): string {
+  return process.platform === 'darwin' ? '截取会议软件的声音需要 macOS 14.2 或更新版本' : '当前平台暂不支持截取会议软件的声音'
+}
+
 export async function prepareAppAudio(timeoutMs = 2500): Promise<'ready' | 'waiting' | 'unsupported'> {
   if (!appAudioSupported()) return 'unsupported'
   if (authorized) return 'ready'

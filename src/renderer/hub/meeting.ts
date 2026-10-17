@@ -152,7 +152,9 @@ function updateSourceUi(): void {
   for (const o of Array.from(local.options)) o.text = source === 'mixed' ? `现场 ${o.value} 人` : `参会 ${o.value} 人`
   for (const o of Array.from(remote.options)) o.text = source === 'mixed' ? `线上 ${o.value} 人` : `参会 ${o.value} 人`
   $('meeting-source-hint').textContent = !appsSupported
-    ? '截取会议软件的声音需要 macOS 14.2 或更新版本'
+    ? api.platform === 'darwin'
+      ? '截取会议软件的声音需要 macOS 14.2 或更新版本'
+      : '当前平台暂不支持截取会议软件的声音，请用麦克风'
     : source === 'mixed'
       ? '现场的人走麦克风，会议软件里的人走软件的声音，分开区分说话人。建议戴耳机：外放时对方的声音会被麦克风再录一遍（重复的部分会自动去掉）。首次使用时系统会请求「录制系统音频」权限。'
       : source === 'app'
