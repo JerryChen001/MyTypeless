@@ -20,7 +20,7 @@
 - Windows 10/11 x64、Node.js 24、Visual Studio 2022 生成工具（“使用 C++ 的桌面开发”，编译 Windows 原生助手时需要）
 - **不要直接 `npm install`**，用 `npm run setup:win`：跳过 better-sqlite3 按 Node 编译的步骤、直接下载 Electron 版预编译包，并修正 Electron 解压不完整的问题。网络慢时先设置 `ELECTRON_MIRROR`（如 `https://npmmirror.com/mirrors/electron/`）
 - `npm run native:win` 编译 Windows 原生助手（目前有 `mt-text`、`mt-focus`、`mt-inject`、`mt-hotkey`）
-- Windows 默认主键是右 Shift（按住约 0.15 秒开始说话、轻按免手持；右 Shift+空格 提问；右 Shift+Ctrl 翻译；右 Shift+字母照常打大写）。设置里可改为 `ralt`、`rctrl` 等。内置识别引擎还没有 Windows 版，暂时只能用云端识别（设置里填 OpenAI 兼容的地址与 Key）
+- Windows 默认主键是右 Ctrl（按住约 0.15 秒开始说话、轻按免手持；右 Ctrl+空格 提问；右 Ctrl+Shift 翻译）。没有右 Ctrl 的键盘在设置里改为 `rshift`（翻译 `rshift+ctrl`，右 Shift+字母照常打大写）或 `ralt`。内置识别引擎还没有 Windows 版，暂时只能用云端识别（设置里填 OpenAI 兼容的地址与 Key）
 - 提交前同样跑 `npm run typecheck`、`npm run test`、`npm run build`、`npm run docs:check`（CI 有 Windows job）
 
 ## 提交流程

@@ -30,7 +30,7 @@ function keysPath(): string {
 
 export const DEFAULT_SETTINGS: Settings = {
   hotkeyMode: 'hold',
-  // D-010：按住主键说话 / 轻按免手持；主键+空格 提问；主键+Shift 翻译；主键 macOS 为 Fn、Windows 为右 Shift（翻译为右 Shift+Ctrl）
+  // D-010：按住主键说话 / 轻按免手持；主键+空格 提问；主键+Shift 翻译；主键 macOS 为 Fn、Windows 为右 Ctrl
   ...defaultBindings(process.platform),
   hotkeyToggle: 'Alt+Space',
   translateTarget: 'English',

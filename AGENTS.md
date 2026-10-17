@@ -94,7 +94,7 @@ npm run docs:check
 - 从 adhoc 版本换到证书签名版本时，系统里旧的授权记录无效但开关显示为开：主窗口「重置授权」按钮会清除本应用的旧记录。
 - 线上会议截取应用声音（D-033，`mt-audiotap`）：用户在授权框点「允许」录制系统音频后，**macOS 会退出并重新打开所有 MyTypeless 实例**（包括隔离测试实例），所以授权必须在开会前完成（`prepareAppAudio` / `--probe`）；没授权时系统只给全零、不报错。Process tap 的 IOProc 不能交给 dispatch queue（会跳过 IO 周期，声音短约 0.3%，与麦克风时间线错位）；tap 报的格式是 48kHz，但数据按输出设备的实际采样率到来（MacBook 扬声器 44.1kHz），要按聚集设备的 `NominalSampleRate` 重采样。外放回声门槛 `ECHO_CORR` 用 `scripts/echo-sim.ts`（真人录音 + 模拟外放）重新标定，同时看“只有回声被去掉多少”和“戴耳机 / 同时说话时现场的话保留多少”。
 - 开发模式下辅助功能/麦克风权限归属于启动 `npm run dev` 的终端应用（iTerm、终端、VS Code…），给 MyTypeless 授权无效；主窗口状态面板会指出是哪个应用。
-- Windows 移植（GAP-008）：调用 macOS 专有能力（`systemPreferences.isTrustedAccessibilityClient` / `askForMediaAccess`、`tccutil`、`defaults`、`ps`、`osascript`、`x-apple.systempreferences:`、模板图、`titleBarStyle: 'hiddenInset'`、`type: 'panel'`）前先判断 `process.platform`——这些在 Windows 上要么不存在（直接抛错，整个启动流程中断），要么行为不同。界面上的键名、系统设置路径、默认快捷键（Windows 主键右 Shift）用 `src/shared/platform.ts`，只属于 macOS 的元素加 `mac-only` 类、只属于其他平台的加 `non-mac`。
+- Windows 移植（GAP-008）：调用 macOS 专有能力（`systemPreferences.isTrustedAccessibilityClient` / `askForMediaAccess`、`tccutil`、`defaults`、`ps`、`osascript`、`x-apple.systempreferences:`、模板图、`titleBarStyle: 'hiddenInset'`、`type: 'panel'`）前先判断 `process.platform`——这些在 Windows 上要么不存在（直接抛错，整个启动流程中断），要么行为不同。界面上的键名、系统设置路径、默认快捷键（Windows 主键右 Ctrl）用 `src/shared/platform.ts`，只属于 macOS 的元素加 `mac-only` 类、只属于其他平台的加 `non-mac`。
 - Windows 上不能直接 `npm install`：better-sqlite3 没有 Node 24 的 Windows 预编译包（现场编译要 VS 的 ClangCL 组件），Electron 33 的安装脚本在 Node 24 下只解压出第一个文件却报告成功；用 `npm run setup:win`（跳过安装脚本、按 Electron ABI 下载预编译包、解压不完整时用系统 tar）。CI 的 Windows job 只跑 typecheck / test / build，用 `npm ci --ignore-scripts` 即可。Windows 上开发服务器固定监听 127.0.0.1（`localhost` 可能只解析到 `::1`，Electron 连接被拒，窗口白屏）。
 
 ## 任务流程

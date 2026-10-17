@@ -2,7 +2,7 @@
 
 ## 范围
 
-GAP-008 第四步：Windows 版 `mt-hotkey`（低级键盘钩子）与 Windows 默认快捷键（Windows 键盘的 Fn 系统读不到）。默认键先定为右 Ctrl，用户真机试用时发现自己的笔记本没有右 Ctrl，右 Alt 也不顺手，最后改为右 Shift（待维护者确认）。没做：macOS 版对区分左右修饰键 `require` 的支持（不需要）。
+GAP-008 第四步：Windows 版 `mt-hotkey`（低级键盘钩子）与 Windows 默认快捷键（Windows 键盘的 Fn 系统读不到）。默认键为右 Ctrl（待维护者确认）。真机试用时发现不少笔记本没有右 Ctrl，所以让右 Shift、右 Alt 也能顺畅地自定义为主键（默认值不变）。没做：macOS 版对区分左右修饰键 `require` 的支持（不需要）。
 
 ## 改动
 
@@ -10,7 +10,7 @@ GAP-008 第四步：Windows 版 `mt-hotkey`（低级键盘钩子）与 Windows �
 - 单修饰键触发按住满 150ms 才确认：右 Shift 用来打大写字母很常见，立即触发会让每次打大写都开一次录音再取消（胶囊闪烁、麦克风短暂打开）；150ms 内按了别的键就什么都不发，松开算轻按。macOS 的 Fn 不受影响。
 - 右 Alt：按下后补发未分配的虚拟键 0xE8，避免单独松开 Alt 激活菜单栏；忽略 AltGr 布局插入的假左 Ctrl。
 - `src/main/bindings.ts`：从 `hotkeys.ts` 拆出的纯逻辑 `parseBinding`，支持区分左右的修饰键（不生成兜底加速键）。
-- `src/shared/platform.ts` 的 `defaultBindings`：macOS Fn 系列；Windows 右 Shift、右 Shift+空格（提问）、右 Shift+Ctrl（翻译，Shift+Shift 无法组合）。`config.ts` 默认值按平台；`index.ts` 迁移：非 macOS 主键仍是 `fn` 时换成本平台默认，旧的 ⌥ 系列迁移只在 macOS 执行。
+- `src/shared/platform.ts` 的 `defaultBindings`：macOS Fn 系列；Windows 右 Ctrl、右 Ctrl+空格（提问）、右 Ctrl+Shift（翻译）。改用右 Shift 时翻译写 `rshift+ctrl`（Shift+Shift 无法组合）。`config.ts` 默认值按平台；`index.ts` 迁移：非 macOS 主键仍是 `fn` 时换成本平台默认，旧的 ⌥ 系列迁移只在 macOS 执行。
 - 界面：首页副标题、最近记录为空提示、会议说明里的主键名（`.main-key`）在非 macOS 按实际主键显示；设置的快捷键占位符按平台默认；格式说明分 `mac-only` / `non-mac` 两版。
 
 ## 验证
@@ -24,4 +24,4 @@ GAP-008 第四步：Windows 版 `mt-hotkey`（低级键盘钩子）与 Windows �
 
 - 物理按键无法由程序模拟（模拟按键被钩子忽略），按住 / 轻按 / 组合的手感需要真机验收。
 - 管理员权限窗口在前台时收不到按键（UIPI）。
-- 默认主键右 Shift 需维护者确认；按住说话比 macOS 晚约 150ms 开始。
+- 默认主键右 Ctrl 需维护者确认；按住说话比 macOS 晚约 150ms 开始。
