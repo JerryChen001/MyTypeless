@@ -1,0 +1,20 @@
+name: 功能建议 / Feature request
+description: 新功能或改进
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: 想解决什么问题 / Problem
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: 建议的做法 / Proposal
+  - type: checkboxes
+    id: privacy
+    attributes:
+      label: 隐私 / Privacy
+      options:
+        - label: 这个建议不需要新增数据外发、录音落盘或采集更多屏幕内容（如需要，请在上面说明原因）

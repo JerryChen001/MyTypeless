@@ -1,0 +1,37 @@
+{
+  "name": "mytypeless",
+  "productName": "MyTypeless",
+  "version": "0.2.1",
+  "description": "macOS 上的 AI 语音听写工具：按住快捷键说话，润色好的文字写入光标处；本地识别、自带 API Key、数据只存本地",
+  "main": "./out/main/index.js",
+  "private": true,
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "native": "bash scripts/build-native.sh",
+    "whisper": "bash scripts/build-whisper.sh",
+    "diarize": "bash scripts/build-diarize.sh",
+    "icon": "python3 scripts/gen-icon.py && cd build && iconutil -c icns icon.iconset -o icon.icns",
+    "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
+    "test": "node --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test test/*.test.ts",
+    "start": "electron-vite preview",
+    "dist": "node scripts/dist.cjs",
+    "release": "node scripts/publish.cjs",
+    "postinstall": "electron-builder install-app-deps",
+    "docs:context": "node scripts/doc-kit/context.mjs",
+    "docs:check": "node scripts/doc-kit/check.mjs"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^9.6.0",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
+    "electron-vite": "^2.3.0",
+    "typescript": "^5.6.3",
+    "vite": "^5.4.11"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "electron-updater": "^6.3.9"
+  }
+}

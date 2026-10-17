@@ -1,0 +1,113 @@
+/* 悬浮胶囊（D-010）：按住说话只显示波形；免手持时两侧出现取消/完成；处理中三点动画；完成闪 ✓ 后消失 */
+:root {
+  --bg: rgba(18, 18, 20, 0.9);
+  --fg: #f5f5f7;
+  --accent: #6aa2ff;
+  --danger: #ff6b6b;
+  --ok: #32d583;
+}
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body {
+  height: 100%;
+  background: transparent;
+  font-family: -apple-system, 'PingFang SC', 'Helvetica Neue', sans-serif;
+  color: var(--fg);
+  overflow: hidden;
+  user-select: none;
+  cursor: default;
+}
+/* 窗口底部居中摆放；窗口其余透明区域点击穿透 */
+.stage {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-bottom: 10px;
+}
+.pill {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 34px;
+  padding: 0 14px;
+  border-radius: 17px;
+  background: var(--bg);
+  backdrop-filter: blur(20px);
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.1);
+  transition: padding 0.18s ease, opacity 0.18s ease, transform 0.18s ease;
+}
+.pill.state-idle { opacity: 0; transform: translateY(6px) scale(0.96); }
+.pill.hands-free { padding: 0 6px; }
+
+.icon {
+  width: 24px; height: 24px; border-radius: 50%; border: none; cursor: pointer;
+  display: none; place-items: center; color: #fff;
+}
+.icon.cancel { background: rgba(255, 255, 255, 0.16); }
+.icon.stop { background: var(--accent); }
+.pill.hands-free.state-recording .icon { display: grid; }
+
+.chip {
+  font-size: 11px; line-height: 18px; padding: 0 7px; border-radius: 9px;
+  background: rgba(106, 162, 255, 0.22); color: #cfe0ff; white-space: nowrap;
+}
+
+.wave { display: none; align-items: center; gap: 3px; height: 18px; }
+.wave i { width: 3px; height: 4px; border-radius: 2px; background: #fff; opacity: 0.9; transition: height 0.07s linear; }
+.pill.state-recording .wave { display: flex; }
+
+.dots { display: none; gap: 4px; padding: 0 6px; }
+.dots i { width: 5px; height: 5px; border-radius: 50%; background: #fff; opacity: 0.35; animation: blink 1s infinite ease-in-out; }
+.dots i:nth-child(2) { animation-delay: 0.15s; }
+.dots i:nth-child(3) { animation-delay: 0.3s; }
+.pill.state-transcribing .dots, .pill.state-polishing .dots, .pill.state-injecting .dots { display: flex; }
+@keyframes blink { 0%, 100% { opacity: 0.25; transform: translateY(0); } 50% { opacity: 1; transform: translateY(-2px); } }
+
+.done-mark { display: none; color: var(--ok); }
+.pill.state-done .done-mark { display: block; }
+.pill.state-error { box-shadow: 0 6px 24px rgba(0, 0, 0, 0.35), 0 0 0 1px rgba(255, 107, 107, 0.6); }
+.pill.state-error .done-mark { display: none; }
+
+.toast {
+  max-width: 400px; padding: 7px 12px; border-radius: 10px;
+  font-size: 12px; line-height: 1.45; text-align: center;
+  background: rgba(40, 20, 20, 0.92); color: #ffd7d7;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+.toast.notice { background: rgba(20, 24, 34, 0.92); color: #dfe8ff; }
+.hidden { display: none !important; }
+
+/* 实时转写文字（D-013）：只显示最后约两行 */
+.live {
+  max-width: 400px; max-height: 44px; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 6px 12px; border-radius: 10px;
+  font-size: 13px; line-height: 1.6; color: #f5f5f7; text-align: center;
+  background: rgba(18, 18, 20, 0.88); box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+}
+
+/* 接近最长录音时长（D-014）：最后 1 分钟显示剩余秒数，最后 10 秒变红闪烁 */
+.remain {
+  font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap;
+  color: #ffd27a;
+}
+.remain.urgent { color: var(--danger); animation: blink-remain 1s infinite steps(2, start); }
+@keyframes blink-remain { to { opacity: 0.45; } }
+
+/* 会议模式（D-015）：听写空闲时胶囊显示会议状态 */
+.meeting-info { display: none; align-items: center; gap: 7px; font-size: 12px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rec-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--danger); animation: rec-pulse 1.6s infinite ease-in-out; }
+@keyframes rec-pulse { 50% { opacity: 0.35; } }
+.pill.state-meeting { padding: 0 6px 0 12px; }
+.pill.state-meeting .meeting-info { display: inline-flex; }
+.pill.state-meeting .icon.meeting-btn { display: grid; }
+.icon.meeting-btn { background: rgba(255, 255, 255, 0.16); }
+.icon.stop-meeting { background: var(--danger); }
+.icon.meeting-btn .i-play { display: none; }
+.pill.meeting-paused .icon.meeting-btn .i-play { display: block; }
+.pill.meeting-paused .icon.meeting-btn .i-pause { display: none; }
+.pill.meeting-paused .rec-dot { animation: none; background: #ffd27a; }
+.pill.meeting-processing .rec-dot, .pill.meeting-processing .icon.meeting-btn { display: none; }
+.pill.meeting-processing { padding: 0 14px; }

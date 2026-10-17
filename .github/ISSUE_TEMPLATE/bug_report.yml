@@ -1,0 +1,40 @@
+name: 问题反馈 / Bug report
+description: 听写、会议、识别、更新等不符合预期
+labels: [bug]
+body:
+  - type: input
+    id: version
+    attributes:
+      label: 版本 / Version
+      description: 设置 → 关于 中的版本与构建号，如 0.2.1（构建 20261017.1043）
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS 版本与机型 / macOS & Mac model
+      placeholder: macOS 26.1, MacBook Pro M2 Pro
+  - type: dropdown
+    id: area
+    attributes:
+      label: 涉及的功能 / Area
+      options: [听写 Dictation, 改写 / 提问 / 翻译, 会议模式 Meeting, 语音识别 Recognition, 词典 Dictionary, 在线更新 Update, 安装 / 权限 Install & permissions, 其他 Other]
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤 / Steps to reproduce
+      description: 识别引擎（内置模型名或云端）、使用的应用（写入到哪里）、快捷键等
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: 期望与实际 / Expected vs actual
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: 日志 / Logs
+      description: 请勿粘贴 API Key、录音内容或私人文字。更新相关日志在 ~/Library/Logs/MyTypeless/update.log
+      render: text

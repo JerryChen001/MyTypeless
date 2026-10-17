@@ -1,0 +1,52 @@
+appId: com.mytypeless.desktop
+productName: MyTypeless
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**
+  - package.json
+  - "!**/*.map"
+npmRebuild: false
+afterPack: scripts/sign-app.cjs
+asar: true
+asarUnpack:
+  - "**/*.node"
+extraResources:
+  - from: native/bin
+    to: bin
+    filter:
+      - "*"
+  - from: build/THIRD_PARTY_NOTICES.md
+    to: THIRD_PARTY_NOTICES.md
+mac:
+  icon: build/icon.icns
+  category: public.app-category.productivity
+  identity: null
+  hardenedRuntime: false
+  entitlements: build/entitlements.plist
+  darkModeSupport: true
+  target:
+    - target: dmg
+      arch:
+        - arm64
+    - target: zip
+      arch:
+        - arm64
+# 在线更新（D-028）：生成 Contents/Resources/app-update.yml（electron-updater 下载时要读其中的缓存目录名）。
+# 地址必须与 src/main/update-info.ts 的 DEFAULT_UPDATE_URL 一致（test/update.test.ts 校验）；上传由 npm run release 完成
+publish:
+  provider: generic
+  url: https://github.com/cjx157791216/mytypeless-releases/releases/latest/download
+  updaterCacheDirName: mytypeless-updater
+# 安装包文件名带版本与构建号（构建号由 scripts/dist.cjs 设置，见 npm run dist）
+artifactName: ${productName}-${version}-${env.MT_BUILD}-${arch}.${ext}
+dmg:
+  title: MyTypeless ${version}
+  contents:
+    - x: 130
+      y: 220
+    - x: 410
+      y: 220
+      type: link
+      path: /Applications

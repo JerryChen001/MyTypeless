@@ -1,0 +1,68 @@
+{
+  "requiredFiles": [
+    "AGENTS.md",
+    "CLAUDE.md",
+    "docs/STATUS.md",
+    "docs/open-questions.md",
+    "docs/decisions/decision-register.md",
+    "docs/implementation/gap-ledger.md",
+    "docs/development/recipes.md",
+    "docs/governance/task-routing.json",
+    "docs/glossary.md"
+  ],
+  "limits": {
+    "rootAgentsLines": 150,
+    "moduleAgentsLines": 80
+  },
+  "excludeDirs": [
+    ".vendor"
+  ],
+  "linkCheckExempt": [
+    "docs/_history/"
+  ],
+  "forbiddenMarkerExempt": [
+    "docs/_history/"
+  ],
+  "placeholderExempt": [
+    "docs/templates/",
+    "docs/governance/playbooks/"
+  ],
+  "idRegistries": [
+    {
+      "name": "未决",
+      "file": "docs/open-questions.md",
+      "pattern": "^\\| (B-\\d{3}) \\|"
+    },
+    {
+      "name": "缺口",
+      "file": "docs/implementation/gap-ledger.md",
+      "pattern": "^\\| (GAP-\\d{3}) \\|"
+    },
+    {
+      "name": "决策",
+      "file": "docs/decisions/decision-register.md",
+      "pattern": "^\\| (D-\\d{3}) \\|"
+    }
+  ],
+  "decisions": {
+    "index": "docs/decisions/decision-register.md",
+    "domainsDir": "docs/decisions/domains",
+    "pattern": "^\\| (D-\\d{3}) \\|"
+  },
+  "acceptance": {
+    "paths": [
+      "docs/acceptance/"
+    ],
+    "pattern": "^\\|\\s*([A-Z]+-[0-9]{3})\\s*\\|"
+  },
+  "glossary": {
+    "file": "docs/glossary.md",
+    "deprecatedExempt": [
+      "docs/_history/",
+      "docs/glossary.md",
+      "docs/decisions/",
+      "docs/templates/",
+      "docs/requirements/reference/"
+    ]
+  }
+}

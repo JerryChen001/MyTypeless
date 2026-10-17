@@ -1,0 +1,11 @@
+# 本机签名证书、下载的第三方预编译库等，不入库
+.vendor/
+node_modules/
+dist/
+out/
+native/bin/
+release/
+.env
+.env.local
+*.log
+.DS_Store

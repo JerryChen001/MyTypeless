@@ -1,0 +1,38 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' blob:; style-src 'self' 'unsafe-inline'; connect-src 'self' ws://localhost:5173; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:" />
+    <title>MyTypeless</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="stage">
+      <div id="error" class="toast hidden"></div>
+      <div id="live" class="live hidden"></div>
+      <div id="pill" class="pill state-idle">
+        <button id="btn-cancel" class="icon cancel" title="取消 (Esc)">
+          <svg viewBox="0 0 16 16" width="12" height="12"><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" stroke-width="2" stroke-linecap="round" /></svg>
+        </button>
+        <span id="mode-chip" class="chip hidden"></span>
+        <div id="wave" class="wave"></div>
+        <span id="remain" class="remain hidden" title="到时会自动结束并写入"></span>
+        <div class="dots"><i></i><i></i><i></i></div>
+        <svg class="done-mark" viewBox="0 0 16 16" width="14" height="14"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <span class="meeting-info"><i class="rec-dot"></i><span id="meeting-time"></span></span>
+        <button id="btn-meeting-pause" class="icon meeting-btn" title="暂停">
+          <svg class="i-pause" viewBox="0 0 16 16" width="11" height="11"><path d="M5 3.5v9M11 3.5v9" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" /></svg>
+          <svg class="i-play" viewBox="0 0 16 16" width="11" height="11"><path d="M5 3.2l8 4.8-8 4.8z" fill="currentColor" /></svg>
+        </button>
+        <button id="btn-meeting-stop" class="icon meeting-btn stop-meeting" title="结束会议">
+          <svg viewBox="0 0 16 16" width="10" height="10"><rect x="3" y="3" width="10" height="10" rx="2" fill="currentColor" /></svg>
+        </button>
+        <button id="btn-stop" class="icon stop" title="完成">
+          <svg viewBox="0 0 16 16" width="12" height="12"><path d="M3 8.5l3.2 3L13 4.5" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </button>
+      </div>
+    </div>
+    <script type="module" src="./main.ts"></script>
+  </body>
+</html>

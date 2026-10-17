@@ -1,0 +1,195 @@
+{
+  "alwaysRead": [
+    "AGENTS.md",
+    "docs/STATUS.md"
+  ],
+  "implementationRead": [
+    "docs/decisions/decision-register.md"
+  ],
+  "impacts": {
+    "contracts": [
+      "docs/contracts/README.md"
+    ],
+    "ipc": [
+      "docs/contracts/ipc.md"
+    ],
+    "native-protocol": [
+      "docs/contracts/native-helpers.md"
+    ],
+    "services": [
+      "docs/contracts/external-services.md"
+    ],
+    "glossary": [
+      "docs/glossary.md"
+    ],
+    "privacy": [
+      "docs/decisions/domains/general.md"
+    ]
+  },
+  "tasks": {
+    "docs-governance": {
+      "description": "维护需求、决策、路由、验收和模块说明",
+      "read": [
+        "docs/AGENTS.md",
+        "docs/open-questions.md",
+        "docs/glossary.md"
+      ],
+      "search": [
+        "docs/"
+      ],
+      "verify": [
+        "npm run docs:check"
+      ],
+      "gates": []
+    },
+    "pipeline": {
+      "description": "听写管线：会话状态机、录音采集、ASR、润色/翻译/改写/提问、历史记录",
+      "read": [
+        "docs/requirements/pipeline.md",
+        "docs/acceptance/pipeline.md",
+        "docs/decisions/domains/pipeline.md",
+        "docs/contracts/ipc.md",
+        "docs/contracts/external-services.md",
+        "docs/contracts/native-helpers.md"
+      ],
+      "search": [
+        "src/main/session.ts",
+        "src/main/polish.ts",
+        "src/main/providers/",
+        "src/main/whisper/",
+        "src/main/wav.ts",
+        "src/renderer/floating-bar/",
+        "src/shared/",
+        "test/",
+        "src/main/live.ts",
+        "src/main/learn.ts",
+        "src/main/learner.ts",
+        "src/main/text.ts"
+      ],
+      "verify": [
+        "npm run typecheck",
+        "npm run test",
+        "npm run build",
+        "npm run docs:check"
+      ],
+      "gates": [
+        "改变失败降级规则（D-008）或写入方式（D-007）需新增决策",
+        "涉及采集新上下文或外发新数据时停下确认（D-002）",
+        "读取输入框内容只限 D-012 规定的范围（插入那一段、读完即弃）"
+      ]
+    },
+    "native": {
+      "description": "原生层：Swift 助手、全局快捷键、写入降级链、选区抓取、前台应用",
+      "read": [
+        "docs/requirements/native.md",
+        "docs/acceptance/native.md",
+        "docs/decisions/domains/native.md",
+        "docs/contracts/native-helpers.md"
+      ],
+      "search": [
+        "native/",
+        "src/main/native.ts",
+        "src/main/hotkeys.ts",
+        "src/main/inject.ts",
+        "src/main/key-press.ts",
+        "src/renderer/floating-bar/"
+      ],
+      "verify": [
+        "npm run native",
+        "npm run typecheck",
+        "npm run test",
+        "npm run build",
+        "npm run docs:check"
+      ],
+      "gates": [
+        "扩大键盘监听范围或记录按键属于人工门禁（D-002）",
+        "快捷键与写入行为需授权真机验证，未验证时在缺口账本标 DONE_PENDING_REVIEW"
+      ]
+    },
+    "ui": {
+      "description": "界面与存储：主窗口、浮动条展示、回答浮卡、托盘、设置/Key/历史/词典存储",
+      "read": [
+        "docs/requirements/ui.md",
+        "docs/acceptance/ui.md",
+        "docs/decisions/domains/ui.md",
+        "docs/contracts/ipc.md"
+      ],
+      "search": [
+        "src/renderer/",
+        "src/main/index.ts",
+        "src/main/config.ts",
+        "src/main/history.ts",
+        "src/preload/",
+        "src/shared/"
+      ],
+      "verify": [
+        "npm run typecheck",
+        "npm run test",
+        "npm run build",
+        "npm run docs:check"
+      ],
+      "gates": [
+        "settings.json、keys.bin、sqlite 表结构的不兼容变更属于人工门禁"
+      ]
+    },
+    "release": {
+      "description": "打包发布：electron-builder 配置、原生助手编译与随包、签名与 entitlements、原生依赖 ABI",
+      "read": [
+        "docs/requirements/release.md",
+        "docs/acceptance/release.md",
+        "docs/decisions/domains/release.md"
+      ],
+      "search": [
+        "electron-builder.yml",
+        "build/",
+        "scripts/",
+        "package.json",
+        "electron.vite.config.ts"
+      ],
+      "verify": [
+        "npm run native",
+        "npm run build",
+        "npm run docs:check"
+      ],
+      "gates": [
+        "Developer ID 签名、公证、对外分发属于人工门禁",
+        "better-sqlite3 保持 v11.x，不要删除 electron-builder.yml 的 npmRebuild: false",
+        "升级 whisper.cpp 需更新 A-007 并回归 mt-whisper 的 /health 与 /inference"
+      ]
+    },
+    "meeting": {
+      "description": "会议模式：会议录制与按句转写、说话人区分与声纹、每人总结与会议纪要、会议存档",
+      "read": [
+        "docs/requirements/meeting.md",
+        "docs/acceptance/meeting.md",
+        "docs/decisions/domains/meeting.md",
+        "docs/decisions/domains/general.md",
+        "docs/contracts/ipc.md",
+        "docs/contracts/external-services.md",
+        "docs/contracts/native-helpers.md"
+      ],
+      "search": [
+        "src/main/meeting/",
+        "src/main/live.ts",
+        "src/main/whisper/",
+        "src/main/history.ts",
+        "src/renderer/hub/",
+        "src/renderer/floating-bar/",
+        "src/shared/",
+        "native/",
+        "test/"
+      ],
+      "verify": [
+        "npm run typecheck",
+        "npm run test",
+        "npm run build",
+        "npm run docs:check"
+      ],
+      "gates": [
+        "录音落盘与声纹保存只限 D-016 的范围",
+        "发给 LLM 的只有转写文字与说话人名字（D-016）",
+        "提示词全部原创（D-001）"
+      ]
+    }
+  }
+}
