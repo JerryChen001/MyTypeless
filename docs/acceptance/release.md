@@ -11,3 +11,6 @@
 | RELE-005 | Given RELE-004 / When 点「下载更新」 / Then 显示进度、可取消；下载完显示「重启并更新」，点击后应用退出并以新版本重新打开，设置、历史、模型、辅助功能与麦克风授权保留 |
 | RELE-006 | Given 新版本已下载 / When 会议进行中、纪要整理中或正在听写时点「重启并更新」 / Then 不重启并提示原因 |
 | RELE-007 | Given 发布地址已有 0.2.1 / When 用 0.2.1 或 adhoc 签名的构建运行 `npm run release -- --yes` / Then 拒绝发布并说明原因；不带 `--yes` 只打印计划不上传 |
+| RELE-008 | Given Windows 上已 `npm run setup:win` / When 运行 `npm run dist` / Then `release/` 下生成 `MyTypeless-<版本>-<构建号>-x64.exe`；双击即装到 `%LOCALAPPDATA%\Programs\MyTypeless`（不弹 UAC），开始菜单与桌面有快捷方式，启动后能听写 |
+| RELE-009 | Given 已安装 Windows 版，发布地址的 `latest.yml` 是更大版本号 / When 检查更新 → 下载更新 → 重启并更新 / Then 静默安装新版本并重新打开，设置、历史、模型保留 |
+| RELE-010 | Given 发布者在 Mac 上 / When 运行 `npm run release -- --yes` / Then Mac 文件传完后触发 `release-windows.yml`，Windows 安装包与 `latest.yml` 传到同一个草稿后才转正式；Windows 构建失败时不发布并给出运行地址 |
