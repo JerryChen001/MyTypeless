@@ -1,6 +1,6 @@
 # 原生助手契约（主进程 ↔ `mt-*`）
 
-助手是独立 CLI 进程，源码在 `native/`（`mt-whisper` 来自第三方 whisper.cpp，见下文），编译到 `native/bin/`，打包后位于 `MyTypeless.app/Contents/Resources/bin/`。路径解析：`src/main/native.ts` 的 `helperPath`。辅助功能权限归属于启动它们的 app。
+助手是独立 CLI 进程，源码在 `native/`（`mt-whisper` 来自第三方 whisper.cpp，见下文），编译到 `native/bin/`，打包后位于 `MyTypeless.app/Contents/Resources/bin/`。路径解析：`src/main/native.ts` 的 `helperPath`（Windows 版助手同名、带 `.exe`，协议与本文相同；移植进度见 GAP-008）。辅助功能权限归属于启动它们的 app。
 
 ## 通用退出码
 

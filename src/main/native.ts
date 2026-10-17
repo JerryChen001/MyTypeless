@@ -8,7 +8,7 @@ import { app } from 'electron'
  * - mt-hotkey: CGEventTap 全局快捷键（按住说话/触发切换），事件走 stdout JSON 行
  * - mt-inject: 文本注入（CGEvent 键入 / --paste 粘贴）
  * - mt-focus:  前台应用探测（bundleId + name）
- * 打包后位于 resources/bin/（electron-builder extraResources）。
+ * 打包后位于 resources/bin/（electron-builder extraResources）。Windows 版助手同名、带 .exe，协议相同。
  */
 
 export interface HotkeyEvent {
@@ -23,6 +23,7 @@ export interface HotkeyMatchConfig {
 }
 
 export function helperPath(name: string): string | null {
+  if (process.platform === 'win32') name += '.exe'
   const candidates = app.isPackaged
     ? [join(process.resourcesPath, 'bin', name)]
     : [join(app.getAppPath(), 'native', 'bin', name)]

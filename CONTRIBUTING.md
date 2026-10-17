@@ -15,6 +15,13 @@
 - 首次：`npm install` → `npm run native` → `npm run whisper` → `npm run diarize` → `npm run dev`
 - 开发模式下辅助功能 / 麦克风权限属于运行 `npm run dev` 的终端应用
 
+### Windows（移植进行中）
+
+- Windows 10/11 x64、Node.js 24、Visual Studio 2022 生成工具（“使用 C++ 的桌面开发”，编译 Windows 原生助手时需要）
+- **不要直接 `npm install`**，用 `npm run setup:win`：跳过 better-sqlite3 按 Node 编译的步骤、直接下载 Electron 版预编译包，并修正 Electron 解压不完整的问题。网络慢时先设置 `ELECTRON_MIRROR`（如 `https://npmmirror.com/mirrors/electron/`）
+- `npm run dev` 可以启动；Windows 原生助手完成前，快捷键走兜底（`Alt+空格` 开始 / 结束听写），写入失败时结果放进剪贴板
+- 提交前同样跑 `npm run typecheck`、`npm run test`、`npm run build`、`npm run docs:check`（CI 有 Windows job）
+
 ## 提交流程
 
 1. Fork 本仓库（维护者直接在本仓库开分支），从最新的 `main` 建分支：`feat/…`、`fix/…`、`docs/…`、`ci/…`。

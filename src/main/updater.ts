@@ -70,15 +70,18 @@ function cleanInstalledDownload(): void {
   }
 }
 
-/** 开发运行（未打包）不检查：Squirrel 只能替换打包好的应用；MT_UPDATE_URL 只用于打包版本机测试 */
+/**
+ * 开发运行（未打包）不检查：Squirrel 只能替换打包好的应用；MT_UPDATE_URL 只用于打包版本机测试。
+ * 只发布了 macOS 安装包与 latest-mac.yml（D-028、D-032），其他平台不检查。
+ */
 export function updateSupported(): boolean {
-  return app.isPackaged
+  return app.isPackaged && process.platform === 'darwin'
 }
 
 export function initUpdater(o: UpdaterOptions): void {
   opts = o
   if (!updateSupported()) {
-    state = { state: 'unsupported', error: '开发版不检查更新' }
+    state = { state: 'unsupported', error: app.isPackaged ? '当前平台暂不支持在线更新' : '开发版不检查更新' }
     return
   }
   cleanInstalledDownload()

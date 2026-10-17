@@ -2,6 +2,8 @@
 
 通道名只在 `src/shared/types.ts` 的 `IPC` 常量中定义（前缀 `mt:`）；渲染端只能通过 preload 暴露的 `window.mytypeless`（类型 `MyTypelessBridge`，`src/shared/api.ts`）调用。新增通道须四处同步：`IPC` 常量 → `src/preload/index.ts` → `src/shared/api.ts` → `src/main/index.ts` 的 handler。
 
+`window.mytypeless.platform` 是常量（`process.platform`，不走 IPC）：界面据此按平台显示快捷键名与系统设置路径（`src/shared/platform.ts`），主窗口把它写到 `body[data-platform]`，`.mac-only` 元素只在 macOS 上显示。
+
 ## 渲染端 → 主进程（`invoke`，有返回值）
 
 | 通道 | Bridge 方法 | 参数 → 返回 |
@@ -49,10 +51,10 @@
 | `speakerModelAction` | `voiceprints.model(action)` | `'download' \| 'cancel' \| 'remove'` → `{ ok, error? }`；进度与状态经 `meetingLive.speakerModel` / `speakerModelProgress` 推送；会议进行或整理中不能删除 |
 | `voiceprintList` / `voiceprintRename` / `voiceprintDelete` | `voiceprints.list/rename/remove` | → 最新 `Voiceprint[]`；改名同步到关联的说话人，删除立即生效（D-016） |
 | `answerInsert` | `system.answerInsert(text)` | 隐藏浮卡 → 激活提问时的前台应用 → 粘贴 → `boolean` |
-| `checkPermissions` | `system.checkPermissions()` | → `PermissionStatus { accessibility, microphone, nativeHotkey, permissionHost?, fnKeyConflict }`（开发模式下 `permissionHost` 为实际持有权限的终端应用；`fnKeyConflict` 表示快捷键用到 Fn 但系统 🌐 键不是「无操作」） |
+| `checkPermissions` | `system.checkPermissions()` | → `PermissionStatus { accessibility, microphone, nativeHotkey, permissionHost?, fnKeyConflict }`（开发模式下 `permissionHost` 为实际持有权限的终端应用；`fnKeyConflict` 表示快捷键用到 Fn 但系统 🌐 键不是「无操作」）；非 macOS：`accessibility` 恒为 true，`permissionHost` 为空，`fnKeyConflict` 为 false |
 | `openPermissionSettings` | `system.openPermissionSettings()` | 弹系统授权提示并打开辅助功能设置 |
-| `resetAccessibility` | `system.resetAccessibility()` | `tccutil reset Accessibility com.mytypeless.desktop`（只清本应用）→ 弹系统授权提示并打开设置 → `boolean` |
-| `openKeyboardSettings` | `system.openKeyboardSettings()` | 打开系统键盘设置（把「按下 🌐 键时」改为「无操作」） |
+| `resetAccessibility` | `system.resetAccessibility()` | `tccutil reset Accessibility com.mytypeless.desktop`（只清本应用）→ 弹系统授权提示并打开设置 → `boolean`（非 macOS 不做事，返回 false） |
+| `openKeyboardSettings` | `system.openKeyboardSettings()` | 打开系统键盘设置（把「按下 🌐 键时」改为「无操作」；仅 macOS） |
 | `barInteractive`（`send`） | `system.setBarInteractive(on)` | 鼠标进入/离开胶囊时切换浮动条是否接收鼠标（其余透明区域点击穿透） |
 | `windowClose`（`send`） | `system.closeWindow()` | 隐藏发送方窗口 |
 
@@ -68,7 +70,7 @@
 | `meetingChanged` | `meeting.onChanged` | 某场会议的内容有变化（`meetingId`），主窗口重新读取 |
 | `meetingCapture` | `meeting.onCapture` | 发给浮动条：`{ on, micDeviceId }`，开/关会议录音（与听写共用麦克风管线，会议结束立即释放麦克风） |
 | `dictChanged` | `dict.onChanged` | 自动学习收录了新词（`string[]`），主窗口刷新词典 |
-| `updateState` | `update.onState` | `UpdateState { state: idle/checking/latest/available/downloading/downloaded/error/unsupported, version?, build?, notes?, dmgUrl?, percent?, bytesPerSec?, error?, checkedAt? }`，广播到所有窗口（D-028） |
+| `updateState` | `update.onState` | `UpdateState { state: idle/checking/latest/available/downloading/downloaded/error/unsupported, version?, build?, notes?, dmgUrl?, percent?, bytesPerSec?, error?, checkedAt? }`，广播到所有窗口（D-028）；开发版与非 macOS 平台为 `unsupported` |
 | `modelProgress` | `models.onProgress` | `ModelProgress { id, state: downloading/verifying/done/error/cancelled, receivedBytes, totalBytes, bytesPerSec?, error? }`，约每 200ms 一次 |
 
 ## SessionProgress

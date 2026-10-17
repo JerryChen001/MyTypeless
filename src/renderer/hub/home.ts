@@ -1,32 +1,15 @@
 import { $, api, escapeHtml, fmtTime } from './util'
 import { currentSettings } from './settings'
+import { comboKeys } from '../../shared/platform'
 
 // 首页（D-017）：问候、使用概览、快捷键速查、最近记录
 
 /** 打字速度的估算（字/分钟），用来算“节省的时间” */
 const TYPING_CPM = 40
 
-const KEY_NAME: Record<string, string> = {
-  fn: 'fn',
-  space: '空格',
-  shift: '⇧',
-  opt: '⌥',
-  option: '⌥',
-  alt: '⌥',
-  ropt: '右⌥',
-  cmd: '⌘',
-  command: '⌘',
-  ctrl: '⌃',
-  control: '⌃',
-  esc: 'esc'
-}
-
 function keys(combo: string): string {
-  return combo
-    .split('+')
-    .map((k) => k.trim().toLowerCase())
-    .filter(Boolean)
-    .map((k) => `<kbd>${escapeHtml(KEY_NAME[k] ?? k.toUpperCase())}</kbd>`)
+  return comboKeys(combo, api.platform)
+    .map((k) => `<kbd>${escapeHtml(k)}</kbd>`)
     .join('')
 }
 

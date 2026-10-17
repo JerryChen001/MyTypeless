@@ -24,6 +24,8 @@ export default defineConfig({
     }
   },
   renderer: {
+    // 固定 IPv4：Windows 上 localhost 可能只解析到 ::1，Electron 按 127.0.0.1 连接会被拒绝
+    server: { host: '127.0.0.1' },
     build: {
       rollupOptions: {
         input: {

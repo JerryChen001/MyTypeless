@@ -6,6 +6,8 @@ import type { AnswerPayload } from '../shared/api'
  * preload：只暴露白名单 API，保持 contextIsolation。
  */
 const api = {
+  /** 运行平台（process.platform），界面按平台显示键名与系统设置路径 */
+  platform: process.platform as string,
   session: {
     start: (mode?: string) => ipcRenderer.invoke(IPC.sessionStart, mode),
     stop: () => ipcRenderer.invoke(IPC.sessionStop),

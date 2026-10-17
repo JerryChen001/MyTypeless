@@ -24,3 +24,17 @@ jobs:
       - run: npm run build
       - run: npm run docs:check
       - run: npm run native
+
+  # Windows 移植（GAP-008）：只检查跨平台部分；跳过安装脚本（Electron 本体与 better-sqlite3 二进制在这几步用不到）
+  check-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
