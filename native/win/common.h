@@ -1,4 +1,4 @@
-// Windows 原生助手共用：UTF-8 / UTF-16 转换、二进制 stdin/stdout、JSON 字符串转义（原创）
+// Windows 原生助手共用：UTF-8 / UTF-16 转换、二进制 stdin/stdout、base64、JSON 字符串转义（原创）
 #pragma once
 #define WIN32_LEAN_AND_MEAN
 #define NOMINMAX
@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <io.h>
 #include <stdio.h>
+#include <string.h>
 #include <string>
 
 inline std::wstring Utf8ToWide(const std::string &s) {
@@ -39,6 +40,48 @@ inline void WriteStdout(const std::string &s) {
   _setmode(_fileno(stdout), _O_BINARY);
   fwrite(s.data(), 1, s.size(), stdout);
   fflush(stdout);
+}
+
+static const char kBase64[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+inline std::string Base64Encode(const std::string &in) {
+  std::string out;
+  size_t i = 0;
+  for (; i + 2 < in.size(); i += 3) {
+    unsigned v = ((unsigned char)in[i] << 16) | ((unsigned char)in[i + 1] << 8) | (unsigned char)in[i + 2];
+    out += kBase64[v >> 18];
+    out += kBase64[(v >> 12) & 63];
+    out += kBase64[(v >> 6) & 63];
+    out += kBase64[v & 63];
+  }
+  if (i < in.size()) {
+    unsigned v = (unsigned char)in[i] << 16;
+    if (i + 1 < in.size()) v |= (unsigned char)in[i + 1] << 8;
+    out += kBase64[v >> 18];
+    out += kBase64[(v >> 12) & 63];
+    out += i + 1 < in.size() ? kBase64[(v >> 6) & 63] : '=';
+    out += '=';
+  }
+  return out;
+}
+
+/** 解码失败（含非法字符）返回 false */
+inline bool Base64Decode(const std::string &in, std::string &out) {
+  out.clear();
+  unsigned v = 0;
+  int bits = 0;
+  for (char c : in) {
+    if (c == '=') break;
+    const char *p = c ? strchr(kBase64, c) : nullptr;
+    if (!p) return false;
+    v = (v << 6) | (unsigned)(p - kBase64);
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out += (char)((v >> bits) & 0xff);
+    }
+  }
+  return true;
 }
 
 /** UTF-8 字符串 → JSON 字符串字面量（带引号） */

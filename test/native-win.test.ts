@@ -6,7 +6,7 @@ import { join } from 'node:path'
 
 // Windows 原生助手（GAP-008）的协议测试：只在 Windows 且已 npm run native:win 时运行
 const bin = (name: string) => join(import.meta.dirname, '..', 'native', 'bin', `${name}.exe`)
-const skip = process.platform !== 'win32' || !existsSync(bin('mt-text')) ? '需要 Windows 与 npm run native:win' : false
+const skip = process.platform !== 'win32' || !existsSync(bin('mt-inject')) ? '需要 Windows 与 npm run native:win' : false
 
 function run(name: string, args: string[], input = '') {
   const r = spawnSync(bin(name), args, { input: Buffer.from(input, 'utf-8'), timeout: 5000 })
@@ -42,4 +42,13 @@ test('mt-focus：激活不存在的进程退出码 2；参数错误 2；选区�
   assert.equal(run('mt-focus', ['--bogus']).code, 2)
   assert.equal(run('mt-focus', ['--selected-text']).code, 5)
   assert.equal(run('mt-focus', ['--caret-context', '20', '20']).code, 5)
+})
+
+// mt-inject 只测不会发出按键的路径；真实键入 / 粘贴 / 抓选区需要桌面，见运行记录里的隔离窗口端到端测试
+test('mt-inject：参数错误、非法 base64、不支持的组合键退出码 2（不发送任何按键）', { skip }, () => {
+  assert.equal(run('mt-inject', []).code, 2)
+  assert.equal(run('mt-inject', ['@@@']).code, 2)
+  assert.equal(run('mt-inject', ['--paste']).code, 2)
+  assert.equal(run('mt-inject', ['--combo', 'ctrl+f13']).code, 2)
+  assert.equal(run('mt-inject', ['--combo', 'hyper+c']).code, 2)
 })
