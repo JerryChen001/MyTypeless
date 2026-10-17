@@ -110,3 +110,11 @@ test('mt-hotkey：配置错误或只有 fn 时退出码 2', { skip }, () => {
   assert.equal(run('mt-hotkey', ['not json', '--replay']).code, 2)
   assert.equal(run('mt-hotkey', [JSON.stringify({ matches: [{ name: 'dictation', key: 'fn' }] }), '--replay']).code, 2)
 })
+
+// mt-diarize（npm run diarize:win）：不带模型只测参数与模型加载失败；降噪 / 识别需要下载模型，见运行记录
+const skipDiarize = process.platform !== 'win32' || !existsSync(bin('mt-diarize')) ? '需要 Windows 与 npm run diarize:win' : false
+
+test('mt-diarize：没有任何模型参数退出码 2；模型文件不存在退出码 4', { skip: skipDiarize }, () => {
+  assert.equal(run('mt-diarize', []).code, 2)
+  assert.equal(run('mt-diarize', ['--denoiser', join(import.meta.dirname, '不存在 的模型.onnx')]).code, 4)
+})

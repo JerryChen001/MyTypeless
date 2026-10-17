@@ -48,7 +48,7 @@ MyTypeless：macOS 上的 AI 语音听写工具（Electron + TypeScript + Swift 
 | `scripts/` | 原生编译、图标生成、文档脚本 `doc-kit/` | — |
 | `build/` | 打包资源：应用图标、entitlements | — |
 | `docs/` | 需求、决策、契约、验收与治理 | [AGENTS.md](docs/AGENTS.md) |
-| `.github/` | CI（`workflows/ci.yml`：macOS 上 typecheck / test / build / docs:check / native；Windows 上 native:win / typecheck / test / build）、Issue 与 PR 模板 | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| `.github/` | CI（`workflows/ci.yml`：macOS 上 typecheck / test / build / docs:check / native；Windows 上 diarize:win / typecheck / test / build）、Issue 与 PR 模板 | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 常见改动的完整步骤见 [docs/development/recipes.md](docs/development/recipes.md)。
 
@@ -59,6 +59,7 @@ npm install            # postinstall 按 Electron ABI 重编译 better-sqlite3
 npm run setup:win      # Windows 代替 npm install（scripts/setup-win.cjs，原因见已知陷阱）
 npm run native         # 编译 Swift 助手到 native/bin/（改了 native/*.swift 必须重跑）
 npm run native:win     # Windows：编译 native/win/*.cpp 到 native/bin/mt-*.exe（需要 VS 2022 生成工具）
+npm run diarize:win    # Windows：另外编译 mt-diarize.exe（首次下载 sherpa-onnx 静态库到 .vendor/sherpa-onnx-win/）
 npm run whisper        # 编译内置识别引擎 mt-whisper（whisper.cpp 源码，需要 brew install cmake；同版本已编译则跳过）
 npm run diarize        # 编译会议声纹助手 mt-diarize（首次下载 sherpa-onnx 预编译静态库到 .vendor/）
 npm run dev            # 开发运行；shell 里有 ELECTRON_RUN_AS_NODE=1 时先 unset

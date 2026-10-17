@@ -28,6 +28,61 @@
 
 #include "sherpa-onnx/c-api/c-api.h"
 
+#ifdef _WIN32
+// Windows 版（GAP-008）：MSVC 没有 getline；long 只有 32 位；fopen / argv 按系统代码页解析路径——一律改用 UTF-8
+#define WIN32_LEAN_AND_MEAN
+#include <windows.h>
+#include <fcntl.h>
+#include <io.h>
+#include <shellapi.h>
+#pragma comment(lib, "shell32.lib")
+typedef intptr_t ssize_t;
+
+static ssize_t getline(char **line, size_t *cap, FILE *f) {
+  size_t len = 0;
+  int c;
+  while ((c = fgetc(f)) != EOF) {
+    if (len + 2 > *cap) {
+      size_t next = *cap ? *cap * 2 : 4096;
+      char *p = realloc(*line, next);
+      if (!p) return -1;
+      *line = p;
+      *cap = next;
+    }
+    (*line)[len++] = (char)c;
+    if (c == '\n') break;
+  }
+  if (!len) return -1;
+  (*line)[len] = '\0';
+  return (ssize_t)len;
+}
+
+static FILE *open_utf8(const char *path) {
+  int n = MultiByteToWideChar(CP_UTF8, 0, path, -1, NULL, 0);
+  if (n <= 0) return NULL;
+  wchar_t *w = malloc(sizeof(wchar_t) * n);
+  if (!w) return NULL;
+  MultiByteToWideChar(CP_UTF8, 0, path, -1, w, n);
+  FILE *f = _wfopen(w, L"rb");
+  free(w);
+  return f;
+}
+#define fopen(path, mode) open_utf8(path)
+#define fseek(f, offset, origin) _fseeki64(f, (__int64)(offset), origin)
+
+/** 按 UTF-16 命令行重新取参数并转成 UTF-8（main 的 argv 是系统代码页，含中文的路径会丢字） */
+static char **utf8_argv(int *argc) {
+  wchar_t **wargv = CommandLineToArgvW(GetCommandLineW(), argc);
+  char **argv = calloc((size_t)*argc + 1, sizeof(char *));
+  for (int i = 0; wargv && argv && i < *argc; i++) {
+    int n = WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, NULL, 0, NULL, NULL);
+    argv[i] = malloc((size_t)n);
+    if (argv[i]) WideCharToMultiByte(CP_UTF8, 0, wargv[i], -1, argv[i], n, NULL, NULL);
+  }
+  return argv;
+}
+#endif
+
 #define SAMPLE_RATE 16000
 #define MAX_SAMPLES (SAMPLE_RATE * 60) // 单段最长 60 秒
 
@@ -57,7 +112,7 @@ static float *read_samples(const char *path, long start, long count, size_t *got
     return NULL;
   }
   size_t got = 0;
-  if (fseek(f, start * (long)sizeof(int16_t), SEEK_SET) == 0) got = fread(pcm, sizeof(int16_t), count, f);
+  if (fseek(f, (int64_t)start * (int64_t)sizeof(int16_t), SEEK_SET) == 0) got = fread(pcm, sizeof(int16_t), count, f);
   fclose(f);
   if (got == 0) {
     free(pcm);
@@ -316,6 +371,10 @@ static int embed(const SherpaOnnxSpeakerEmbeddingExtractor *ex, int32_t dim, con
 }
 
 int main(int argc, char **argv) {
+#ifdef _WIN32
+  argv = utf8_argv(&argc);
+  _setmode(_fileno(stdout), _O_BINARY); // 换行原样输出，不变成 CRLF
+#endif
   const char *model = NULL;
   const char *segmentation = NULL;
   const char *denoiser_model = NULL;
