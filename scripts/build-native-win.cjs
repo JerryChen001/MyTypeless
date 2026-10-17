@@ -7,7 +7,7 @@
  * 需要 Visual Studio 2022 生成工具（“使用 C++ 的桌面开发”，自带 CMake）；PATH 里有 cmake 时优先用它。
  */
 const { execFileSync } = require('child_process')
-const { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } = require('fs')
+const { copyFileSync, cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } = require('fs')
 const os = require('os')
 const { join } = require('path')
 
@@ -37,18 +37,23 @@ run(['-S', src, '-B', build, '-A', 'x64', `-DSHERPA_DIR=${withDiarize ? sherpaDi
 run(['--build', build, '--config', 'Release', '--parallel'])
 
 mkdirSync(out, { recursive: true })
-let busy = 0
+// 上次替换时改名留下的旧文件：已经没有进程在用的就删掉
+for (const f of readdirSync(out)) {
+  if (/\.old-\d+\.exe$/.test(f)) rmSync(join(out, f), { force: true, maxRetries: 0 }) // 仍在运行的删不掉，忽略
+}
 for (const name of HELPERS) {
+  const dest = join(out, `${name}.exe`)
   try {
-    copyFileSync(join(build, 'Release', `${name}.exe`), join(out, `${name}.exe`))
-    console.log(`${name}.exe → ${join(out, `${name}.exe`)}`)
+    copyFileSync(join(build, 'Release', `${name}.exe`), dest)
   } catch (err) {
     if (err.code !== 'EBUSY' && err.code !== 'EPERM') throw err
-    busy++
-    console.warn(`${name}.exe 正在运行（应用开着），没有替换；退出应用后重新运行本命令`)
+    // 应用开着、助手正在运行：Windows 不能覆盖运行中的程序，但可以改名——挪开旧的再放新的（重启助手后生效）
+    renameSync(dest, join(out, `${name}.old-${Date.now()}.exe`))
+    copyFileSync(join(build, 'Release', `${name}.exe`), dest)
+    console.warn(`${name}.exe 正在运行，旧文件已改名挪开；重启应用后用上新版本`)
   }
+  console.log(`${name}.exe → ${dest}`)
 }
-if (busy) process.exitCode = 1
 
 function ensureSherpa() {
   const stamp = join(sherpaDir, 'VERSION')
