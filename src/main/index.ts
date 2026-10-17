@@ -23,7 +23,7 @@ import { MeetingManager, meetingStore } from './meeting'
 import { appAudioSupported, listAudioApps, prepareAppAudio } from './meeting/app-audio'
 import { denoiser, diarizer } from './meeting/diarizer'
 import { buildTranscript, exportMarkdown } from './meeting/minutes'
-import { comboKeys } from '../shared/platform'
+import { comboKeys, defaultBindings } from '../shared/platform'
 
 /**
  * MyTypeless 主进程入口
@@ -705,8 +705,13 @@ if (!gotLock) {
 
     // 升级迁移：快捷键仍是旧默认值（⌥+空格 / ⌥T / ⌥R / ⌥A）→ 换成 Fn 系列新默认值（D-010）
     const b = loadSettings().bindings
-    if (b?.dictation === 'opt+space' && b.translate === 'opt+t' && b.rewrite === 'opt+r' && b.ask === 'opt+a') {
+    if (isMac && b?.dictation === 'opt+space' && b.translate === 'opt+t' && b.rewrite === 'opt+r' && b.ask === 'opt+a') {
       saveSettings({ hotkeyKey: 'fn', bindings: { dictation: 'fn', translate: 'fn+shift', rewrite: '', ask: 'fn+space' } })
+      hotkeys.registerAll()
+    }
+    // 非 macOS 读不到 Fn：主键仍是 fn（如从 macOS 拷来的设置）→ 换成本平台默认（Windows 右 Ctrl，GAP-008）
+    if (!isMac && /(^|\+)fn(\+|$)/i.test(b?.dictation ?? '')) {
+      saveSettings(defaultBindings(process.platform))
       hotkeys.registerAll()
     }
     // 升级迁移：选了云端但从未配置识别 Key（无法使用）→ 改用内置本地引擎（D-009）

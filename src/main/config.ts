@@ -1,4 +1,5 @@
 import { app, safeStorage } from 'electron'
+import { defaultBindings } from '../shared/platform'
 import { join } from 'path'
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs'
 import type { Settings } from '../shared/types'
@@ -29,16 +30,9 @@ function keysPath(): string {
 
 export const DEFAULT_SETTINGS: Settings = {
   hotkeyMode: 'hold',
-  hotkeyKey: 'fn',
+  // D-010：按住主键说话 / 轻按免手持；主键+空格 提问；主键+Shift 翻译；主键 macOS 为 Fn、Windows 为右 Ctrl
+  ...defaultBindings(process.platform),
   hotkeyToggle: 'Alt+Space',
-  // D-010：按住 Fn 说话 / 轻按 Fn 免手持；Fn+空格 提问；Fn+Shift 翻译；
-  // 改写不需要单独的键：选中文字后按 Fn 即改写（rewrite 留空 = 不注册单独快捷键）
-  bindings: {
-    dictation: 'fn',
-    translate: 'fn+shift',
-    rewrite: '',
-    ask: 'fn+space'
-  },
   translateTarget: 'English',
   autoStopSilenceMs: 0, // hold 模式下默认关（松键即停）；toggle 模式建议开
   maxRecordingMs: 20 * 60_000, // 20 分钟（D-014）；最后 1 分钟浮动条倒计时

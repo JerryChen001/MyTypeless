@@ -3,42 +3,18 @@ import { loadSettings } from './config'
 import { HotkeyWatcher, type HotkeyMatchConfig } from './native'
 import type { FeatureMode } from '../shared/types'
 import { createKeyHandlers } from './key-press'
+import { parseBinding } from './bindings'
 
 /**
  * 热键控制器（按住 Fn 说话的交互，D-010）
- * - 主键（听写，默认 Fn）：按住 = 按住说话，松开写入；轻按（TAP_MS 内松开）= 免手持，再按一下结束；
+ * - 主键（听写，默认 macOS Fn、Windows 右 Ctrl）：按住 = 按住说话，松开写入；轻按（TAP_MS 内松开）= 免手持，再按一下结束；
  *   开始时若有选中文字，会话自动转为改写
  * - 提问 / 翻译 / 改写（如单独绑定）：按一下开始（免手持），再按一下或按主键结束
  * - 按住 Fn 时又按了空格 / Shift：原生助手先 abort 听写，再触发对应组合
- * - 原生 CGEventTap 助手优先（吞触发键、可感知抬起）；
+ * - 原生助手优先（macOS CGEventTap / Windows 低级键盘钩子；吞触发键、可感知抬起）；绑定解析见 bindings.ts；
  *   不可用时（典型：尚未授予辅助功能）回退 globalShortcut —— 感知不到抬起，hold 退化为触发式，
  *   并定期重试原生助手，授权后自动切回。
  */
-
-const MOD_MAP: Record<string, string> = {
-  opt: 'opt', option: 'opt', alt: 'opt',
-  cmd: 'cmd', command: 'cmd',
-  ctrl: 'ctrl', control: 'ctrl',
-  shift: 'shift',
-  fn: 'fn'
-}
-
-const ACCEL_MOD: Record<string, string> = {
-  opt: 'Alt', cmd: 'Command', ctrl: 'Control', shift: 'Shift'
-}
-
-const ACCEL_KEY: Record<string, string> = {
-  space: 'Space', return: 'Return', enter: 'Return', tab: 'Tab', escape: 'Escape', esc: 'Escape',
-  delete: 'Backspace', backspace: 'Backspace', forwarddelete: 'Delete',
-  up: 'Up', down: 'Down', left: 'Left', right: 'Right',
-  home: 'Home', end: 'End', pageup: 'PageUp', pagedown: 'PageDown'
-}
-
-/** 单修饰键触发（只有原生助手支持） */
-const MODIFIER_ONLY_KEYS = new Set([
-  'fn', 'ropt', 'rightoption', 'lopt', 'leftoption', 'rcmd', 'rightcmd', 'lcmd', 'leftcmd',
-  'rshift', 'rightshift', 'lshift', 'leftshift', 'rctrl', 'rightcontrol', 'lctrl', 'leftcontrol'
-])
 
 const NATIVE_RETRY_MS = 4000
 /** 主键无法用 globalShortcut 表达（如 Fn）时，兜底模式下的替代键 */
@@ -47,28 +23,6 @@ const FALLBACK_MAIN_ACCELERATOR = 'Alt+Space'
 interface Binding {
   mode: FeatureMode
   combo: string
-}
-
-export interface ParsedBinding {
-  match: HotkeyMatchConfig
-  /** globalShortcut 加速键；单修饰键触发无法用 globalShortcut 表达时为 null */
-  accelerator: string | null
-}
-
-export function parseBinding(mode: string, combo: string): ParsedBinding | null {
-  const parts = combo.split('+').map((s) => s.trim().toLowerCase()).filter(Boolean)
-  if (!parts.length) return null
-  const key = parts[parts.length - 1]
-  const mods = parts.slice(0, -1).map((m) => MOD_MAP[m])
-  if (mods.some((m) => !m)) return null
-  const require = [...new Set(mods)]
-
-  let accelerator: string | null = null
-  if (!MODIFIER_ONLY_KEYS.has(key) && !require.includes('fn')) {
-    const accelKey = ACCEL_KEY[key] ?? (/^f\d{1,2}$/.test(key) ? key.toUpperCase() : key.length === 1 ? key.toUpperCase() : null)
-    if (accelKey) accelerator = require.map((m) => ACCEL_MOD[m]).concat(accelKey).join('+')
-  }
-  return { match: { name: mode, key, require }, accelerator }
 }
 
 export class HotkeyController {

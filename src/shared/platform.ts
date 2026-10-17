@@ -27,7 +27,9 @@ const WIN_KEYS: Record<string, string> = {
   option: 'Alt',
   alt: 'Alt',
   ropt: '右Alt',
+  ralt: '右Alt',
   lopt: '左Alt',
+  lalt: '左Alt',
   cmd: 'Win',
   command: 'Win',
   ctrl: 'Ctrl',
@@ -61,4 +63,19 @@ export function micPermissionHint(platform: string): string {
   return isMacPlatform(platform)
     ? '没有麦克风权限：系统设置 → 隐私与安全性 → 麦克风 → 允许 MyTypeless'
     : '没有麦克风权限：设置 → 隐私和安全性 → 麦克风 → 打开「允许桌面应用访问麦克风」'
+}
+
+export interface DefaultBindings {
+  hotkeyKey: string
+  bindings: { dictation: string; translate: string; rewrite: string; ask: string }
+}
+
+/**
+ * 默认快捷键：macOS 按住 Fn（D-010）。Windows 键盘的 Fn 系统读不到，改用右 Ctrl（GAP-008 提议，待维护者确认）；
+ * 没有右 Ctrl 的键盘可在设置里改为 rshift（翻译 rshift+ctrl）、ralt 等。
+ * 改写不需要单独的键：选中文字后按主键即改写（rewrite 留空 = 不注册单独快捷键）。
+ */
+export function defaultBindings(platform: string): DefaultBindings {
+  if (isMacPlatform(platform)) return { hotkeyKey: 'fn', bindings: { dictation: 'fn', translate: 'fn+shift', rewrite: '', ask: 'fn+space' } }
+  return { hotkeyKey: 'rctrl', bindings: { dictation: 'rctrl', translate: 'rctrl+shift', rewrite: '', ask: 'rctrl+space' } }
 }

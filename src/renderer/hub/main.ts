@@ -103,6 +103,7 @@ void api.system.appInfo().then((info) => {
 
 void (async () => {
   await loadSettingsIntoUi()
+  renderShortcuts() // 也填好各页写着主键名的地方（会议页说明等）
   const s = await api.settings.get()
   setMode(s.appMode === 'meeting' ? 'meeting' : 'personal')
   const live = await api.meeting.getLive()

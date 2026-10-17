@@ -1,6 +1,6 @@
 import { $, api, escapeHtml, fmtTime } from './util'
 import { currentSettings } from './settings'
-import { comboKeys } from '../../shared/platform'
+import { comboKeys, defaultBindings } from '../../shared/platform'
 
 // 首页（D-017）：问候、使用概览、快捷键速查、最近记录
 
@@ -24,8 +24,11 @@ function greeting(): string {
 
 export function renderShortcuts(): void {
   const s = currentSettings()
-  const b = s?.bindings ?? { dictation: 'fn', translate: 'fn+shift', rewrite: '', ask: 'fn+space' }
-  const main = b.dictation || 'fn'
+  const defaults = defaultBindings(api.platform)
+  const b = s?.bindings ?? defaults.bindings
+  const main = b.dictation || defaults.hotkeyKey
+  // 页面里写死的 Fn：macOS 保持原文，其他平台换成实际的主键
+  if (api.platform !== 'darwin') for (const el of document.querySelectorAll('.main-key')) el.innerHTML = keys(main)
   const rows: Array<[string, string]> = [
     [keys(main), '按住说话，松开写入'],
     [keys(main), '轻按一下：免手持，说完再按一下'],
@@ -56,7 +59,8 @@ export async function loadHome(): Promise<void> {
   const list = $('recent-list')
   list.innerHTML = ''
   if (!recent.length) {
-    list.innerHTML = '<div class="empty">还没有听写记录。在任意输入框按住 fn 试试</div>'
+    const main = currentSettings()?.bindings?.dictation || defaultBindings(api.platform).hotkeyKey
+    list.innerHTML = `<div class="empty">还没有听写记录。在任意输入框按住 ${escapeHtml(comboKeys(main, api.platform).join('+'))} 试试</div>`
     return
   }
   for (const rec of recent) {
