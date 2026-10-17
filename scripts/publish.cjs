@@ -14,6 +14,9 @@
  * 打包时不能有未提交的改动，且那次提交已合并到 GitHub 的 main（release/build-info.json，由 npm run dist 写入）。
  * 终端设了 HTTPS_PROXY 时自动让 fetch 走代理；发布后读到的版本有缓存延迟，会重读最多约 2 分钟。
  * 先建草稿、传完全部文件再转正式：传到一半失败时，已安装的应用看不到不完整的新版本；重跑会删掉同版本的旧草稿。
+ * Windows（D-036）：Mac 的文件传完后触发 GitHub Actions 的 release-windows.yml，在 Windows 机器上按同一提交打包，
+ * 把安装包与 latest.yml 传到同一个草稿（scripts/publish-win.cjs）；等它成功、文件齐了才转正式——两个平台同时看到新版本，
+ * 发布者不需要 Windows 电脑。--no-windows 只发 Mac（Windows 版停在上一个版本，不推荐）。
  * 上传属于对外分发（人工门禁）：不带 --yes 只打印计划。
  */
 const { execFileSync } = require('child_process')
@@ -25,6 +28,8 @@ const root = join(__dirname, '..')
 const API = 'https://api.github.com'
 /** 旧发布仓库：0.2.1 从这里检查更新（D-029）；只同步版本说明 */
 const LEGACY_REPOS = ['cjx157791216/mytypeless-releases']
+/** Windows 安装包的构建工作流（.github/workflows/，D-036） */
+const WIN_WORKFLOW = 'release-windows.yml'
 
 /** "0.2.10" > "0.2.9"：只比较数字部分 */
 function compareVersions(a, b) {
@@ -43,12 +48,18 @@ function parseArtifact(name) {
   return m ? { version: m[1], build: m[2], ext: m[3] } : null
 }
 
+/** MyTypeless-0.3.1-20261018.1015-x64.exe → { version, build }（Windows 安装包，D-036） */
+function parseWinArtifact(name) {
+  const m = /^MyTypeless-(\d+\.\d+\.\d+)-(\d{8}\.\d{4})-x64\.exe$/.exec(name)
+  return m ? { version: m[1], build: m[2] } : null
+}
+
 /** GitHub Release 里某个文件的下载地址 */
 function githubAssetUrl(repo, version, file) {
   return `https://github.com/${repo}/releases/download/v${version}/${file}`
 }
 
-/** 版本说明（electron-updater generic 格式 + build、dmgUrl） */
+/** 版本说明（electron-updater generic 格式 + build、dmgUrl）。zipUrl 为自动更新下载的文件（macOS zip、Windows 安装包 exe；Windows 没有 dmgUrl） */
 function buildFeed({ version, build, zipUrl, dmgUrl, sha512, size, notes, date }) {
   const yaml = require('js-yaml')
   return yaml.dump({
@@ -59,7 +70,7 @@ function buildFeed({ version, build, zipUrl, dmgUrl, sha512, size, notes, date }
     sha512,
     releaseDate: date,
     releaseNotes: notes || '',
-    dmgUrl
+    ...(dmgUrl ? { dmgUrl } : {})
   }, { lineWidth: -1 })
 }
 
@@ -77,9 +88,9 @@ function sha512(file) {
   })
 }
 
-/** 匿名读取已发布的版本说明（与已安装的应用读法相同）→ 版本号；还没有发布过为 null */
-async function publishedVersion(feed) {
-  const r = await fetch(`${feed}/latest-mac.yml`, { signal: AbortSignal.timeout(30_000) })
+/** 匿名读取已发布的版本说明（与已安装的应用读法相同）→ 版本号；还没有发布过为 null。file：macOS latest-mac.yml、Windows latest.yml */
+async function publishedVersion(feed, file = 'latest-mac.yml') {
+  const r = await fetch(`${feed}/${file}`, { signal: AbortSignal.timeout(30_000) })
   if (r.status === 404) return null
   if (!r.ok) throw new Error(`读取已发布的版本说明失败：HTTP ${r.status}`)
   return require('js-yaml').load(await r.text())?.version ?? null
@@ -120,6 +131,7 @@ function arg(name) {
 
 async function main() {
   const dry = process.argv.includes('--dry-run')
+  const withWindows = !process.argv.includes('--no-windows')
   const repo = githubRepo()
   const feed = (arg('--feed') || `https://github.com/${repo}/releases/latest/download`).replace(/\/+$/, '')
   const assets = arg('--assets')?.replace(/\/+$/, '')
@@ -186,15 +198,27 @@ async function main() {
   if (dry) return
 
   if (!process.argv.includes('--yes')) {
-    console.log(`\n将在 https://github.com/${repo} 发布 ${tag}（提交 ${sha.slice(0, 7)}），上传以上三个文件，并在 ${LEGACY_REPOS.join('、')} 同步版本说明（对外可见）。确认后加 --yes 重新运行。`)
+    const win = withWindows ? '，再由 GitHub Actions 打包 Windows 安装包传到同一个 Release' : '（--no-windows：不发 Windows 版）'
+    console.log(`\n将在 https://github.com/${repo} 发布 ${tag}（提交 ${sha.slice(0, 7)}），上传以上三个文件${win}，并在 ${LEGACY_REPOS.join('、')} 同步版本说明（对外可见）。确认后加 --yes 重新运行。`)
     process.exit(1)
   }
   const token = process.env.GH_TOKEN
   if (!token) throw new Error('缺少环境变量 GH_TOKEN：用 GH_TOKEN=$(gh auth token) 或有代码仓库与旧发布仓库 Contents 读写权限的令牌')
 
-  const pub = await release(token, repo, { tag, sha, name: `MyTypeless ${version}`, body: `${notes}\n\n构建 ${build}`.trim(), files: [zipPath, join(dir, dmgName), feedFile] })
+  const pub = await release(token, repo, {
+    tag,
+    sha,
+    name: `MyTypeless ${version}`,
+    body: `${notes}\n\n构建 ${build}`.trim(),
+    files: [zipPath, join(dir, dmgName), feedFile],
+    beforePublish: withWindows ? (rel) => buildWindows(token, repo, rel, { sha, tag, notes }) : null
+  })
   const now = await waitForVersion(() => publishedVersion(feed), version)
   if (now !== version) throw new Error(`发布后读到的版本是 ${now}，不是 ${version}`)
+  if (withWindows) {
+    const w = await waitForVersion(() => publishedVersion(feed, 'latest.yml'), version)
+    if (w !== version) throw new Error(`发布后读到的 Windows 版本是 ${w}，不是 ${version}`)
+  }
   console.log(`已发布 ${version}（构建 ${build}）：${pub.html_url}`)
 
   // 旧发布仓库：只放版本说明（安装包地址指向代码仓库），让还在读旧地址的版本更新过来
@@ -206,8 +230,43 @@ async function main() {
   }
 }
 
-/** 建草稿 Release → 上传文件 → 转为正式并设为最新；同版本的旧草稿（上次传到一半失败）先删掉，已正式发布的同版本不覆盖 */
-async function release(token, repo, { tag, sha, name, body, files }) {
+/**
+ * Windows 安装包（D-036）：触发 release-windows.yml（在 GitHub 的 Windows 机器上按 sha 打包，传到草稿 rel），
+ * 等它结束并核对草稿里有安装包与 latest.yml。失败时抛错，草稿保留、不转正式（重跑 npm run release 会删掉它重来）
+ */
+async function buildWindows(token, repo, rel, { sha, tag, notes, ref = 'main' }) {
+  const since = Date.now() - 60_000
+  await gh(token, 'POST', `/repos/${repo}/actions/workflows/${WIN_WORKFLOW}/dispatches`, { ref, inputs: { sha, tag, notes } })
+  console.log('已触发 Windows 安装包构建（GitHub Actions，约 20～40 分钟）…')
+  const title = winRunTitle(tag)
+  let run = null
+  for (let i = 0; i < 30 && !run; i++) {
+    await new Promise((r) => setTimeout(r, 10_000))
+    const list = await gh(token, 'GET', `/repos/${repo}/actions/workflows/${WIN_WORKFLOW}/runs?event=workflow_dispatch&per_page=20`)
+    run = list.workflow_runs.find((x) => x.display_title === title && Date.parse(x.created_at) >= since) ?? null
+  }
+  if (!run) throw new Error(`没有找到 ${WIN_WORKFLOW} 的运行：确认 main 上有这个工作流、令牌有 Actions 读写权限`)
+  console.log(`  ${run.html_url}`)
+  const deadline = Date.now() + 90 * 60_000
+  while (run.status !== 'completed') {
+    if (Date.now() > deadline) throw new Error(`Windows 安装包构建超过 90 分钟还没结束：${run.html_url}`)
+    await new Promise((r) => setTimeout(r, 30_000))
+    run = await gh(token, 'GET', `/repos/${repo}/actions/runs/${run.id}`)
+  }
+  if (run.conclusion !== 'success') throw new Error(`Windows 安装包构建失败（${run.conclusion}）：${run.html_url}；草稿已保留，修好后重跑 npm run release`)
+  const names = (await gh(token, 'GET', `/repos/${repo}/releases/${rel.id}/assets?per_page=100`)).map((a) => a.name)
+  const exe = names.find((n) => parseWinArtifact(n)?.version === tag.slice(1))
+  if (!exe || !names.includes('latest.yml')) throw new Error(`草稿里没有 Windows 安装包或 latest.yml（现有：${names.join('、')}）`)
+  console.log(`  Windows 安装包：${exe}`)
+}
+
+/** Windows 构建那次运行的标题（与 release-windows.yml 的 run-name 一致），用来找到本次触发的运行 */
+function winRunTitle(tag) {
+  return `Windows 安装包 ${tag}`
+}
+
+/** 建草稿 Release → 上传文件 →（beforePublish：Windows 安装包）→ 转为正式并设为最新；同版本的旧草稿（上次传到一半失败）先删掉，已正式发布的同版本不覆盖 */
+async function release(token, repo, { tag, sha, name, body, files, beforePublish = null }) {
   for (const r of await gh(token, 'GET', `/repos/${repo}/releases?per_page=30`)) {
     if (r.tag_name !== tag) continue
     if (!r.draft) throw new Error(`${repo} 的 ${tag} 已经发布过：先升级 package.json 的 version`)
@@ -219,10 +278,11 @@ async function release(token, repo, { tag, sha, name, body, files }) {
     console.log(`上传 ${basename(file)} → ${repo}…`)
     await gh(token, 'POST', `${uploadBase}?name=${encodeURIComponent(basename(file))}`, await openAsBlob(file))
   }
+  if (beforePublish) await beforePublish(rel)
   return gh(token, 'PATCH', `/repos/${repo}/releases/${rel.id}`, { draft: false, make_latest: 'true' })
 }
 
-module.exports = { compareVersions, parseArtifact, buildFeed, githubAssetUrl, waitForVersion }
+module.exports = { compareVersions, parseArtifact, parseWinArtifact, buildFeed, githubAssetUrl, waitForVersion, winRunTitle, githubRepo, sha512, gh, buildWindows }
 
 if (require.main === module) {
   // 终端设了代理（HTTPS_PROXY）时 Node 的 fetch 默认不走代理，大文件直连 GitHub 会传到一半断开：带上 NODE_USE_ENV_PROXY 重新运行自己

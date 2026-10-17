@@ -1,0 +1,63 @@
+# Windows 安装包（D-036）：在 GitHub 的 Windows 机器上打包，发布者不需要 Windows 电脑。
+# - 发布：Mac 上的 npm run release 传完 Mac 文件后触发本工作流（带 sha、tag、notes），这里打包并把安装包与 latest.yml
+#   传到同一个草稿 Release；npm run release 等它成功后才转正式（scripts/publish.cjs 的 buildWindows）
+# - 测试构建：在 Actions 页面手动运行、tag 留空，只生成构建产物（Artifacts 里下载安装包），不碰 Release
+name: release-windows
+run-name: Windows 安装包 ${{ inputs.tag || '（测试构建）' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: 打包的提交（留空为所选分支的最新提交）
+        required: false
+      tag:
+        description: 上传到哪个草稿 Release（如 v0.3.1；留空只生成构建产物）
+        required: false
+      notes:
+        description: 更新内容（写进 latest.yml）
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 80
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ inputs.sha || github.sha }}
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      # 按 Electron ABI 下载 better-sqlite3 预编译包（打进安装包）
+      - run: npm run setup:win
+      - uses: actions/cache@v4
+        with:
+          path: .vendor/sherpa-onnx-win
+          key: sherpa-onnx-win-${{ hashFiles('scripts/build-native-win.cjs') }}
+      - uses: actions/cache@v4
+        with:
+          path: |
+            .vendor/whisper.cpp
+            native/bin/mt-whisper.exe
+            native/bin/.mt-whisper-win-version
+          key: whisper-win-${{ hashFiles('scripts/build-whisper-win.cjs') }}
+      - run: npm run dist
+      - name: 上传到草稿 Release
+        if: ${{ inputs.tag != '' }}
+        run: node scripts/publish-win.cjs
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          MT_TAG: ${{ inputs.tag }}
+          MT_NOTES: ${{ inputs.notes }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MyTypeless-windows
+          path: |
+            release/MyTypeless-*-x64.exe
+            release/latest.yml
+          retention-days: 14

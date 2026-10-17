@@ -5,11 +5,11 @@ export const GITHUB_REPO = 'cjx157791216/MyTypeless'
 
 /**
  * 默认发布地址：最新正式 Release 的下载目录（GitHub 跳转到 releases/download/v<版本>/），不用登录即可读取。
- * 其中 latest-mac.yml 是版本说明，安装包在同一个 Release 里；由 scripts/publish.cjs 发布。
+ * 其中 latest-mac.yml（macOS）/ latest.yml（Windows，D-036）是版本说明，安装包在同一个 Release 里；由 scripts/publish.cjs 发布。
  */
 export const DEFAULT_UPDATE_URL = `https://github.com/${GITHUB_REPO}/releases/latest/download`
 
-/** 下载缓存目录名（~/Library/Caches/<名>/pending/），与 electron-builder.yml 的 publish.updaterCacheDirName 一致 */
+/** 下载缓存目录名（macOS ~/Library/Caches/<名>/pending/，Windows %LOCALAPPDATA%\<名>\pending\），与 electron-builder.yml 的 publish.updaterCacheDirName 一致 */
 export const UPDATER_CACHE_DIR = 'mytypeless-updater'
 
 /** 启动后首次检查的延迟与之后的检查间隔 */
@@ -32,7 +32,7 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-/** 缓存里的安装包已装上（版本不比当前新）：可以删掉（约 110MB）。fileName 形如 MyTypeless-0.2.2-20261017.1017-arm64.zip */
+/** 缓存里的安装包已装上（版本不比当前新）：可以删掉（约 110MB）。fileName 形如 MyTypeless-0.2.2-20261017.1017-arm64.zip / -x64.exe */
 export function pendingIsInstalled(fileName: string, current: string): boolean {
   const v = /^MyTypeless-(\d+\.\d+\.\d+)-/.exec(fileName)?.[1]
   return !!v && compareVersions(v, current) <= 0

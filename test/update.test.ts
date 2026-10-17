@@ -6,7 +6,7 @@ import { createRequire } from 'node:module'
 import { compareVersions as cmp, DEFAULT_UPDATE_URL, friendlyUpdateError, needsManualInstall, pendingIsInstalled, UPDATER_CACHE_DIR, updateUrl } from '../src/main/update-info.ts'
 
 const require = createRequire(import.meta.url)
-const { compareVersions, parseArtifact, buildFeed, githubAssetUrl, waitForVersion } = require('../scripts/publish.cjs')
+const { compareVersions, parseArtifact, parseWinArtifact, buildFeed, githubAssetUrl, waitForVersion, winRunTitle } = require('../scripts/publish.cjs')
 const yaml = require('js-yaml')
 
 test('发布地址：GitHub 公开仓库最新 Release 的下载目录，MT_UPDATE_URL 只用于本机测试', () => {
@@ -76,6 +76,26 @@ test('发布脚本：版本说明是 electron-updater 能读的格式（zip 绝�
   assert.equal(feed.path, zipUrl)
   assert.equal(feed.releaseNotes, '中文识别更准\n修复会议分人')
   assert.match(feed.dmgUrl, /\.dmg$/)
+})
+
+test('Windows（D-036）：安装包文件名解析；版本说明没有 DMG 地址，安装包为绝对地址', () => {
+  assert.deepEqual(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-x64.exe'), { version: '0.3.1', build: '20261018.1015' })
+  assert.equal(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-x64.exe.blockmap'), null)
+  assert.equal(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-arm64.zip'), null)
+  assert.equal(parseArtifact('MyTypeless-0.3.1-20261018.1015-x64.exe'), null) // Mac 的发布流程不会拿到 Windows 安装包
+  const url = 'https://github.com/o/r/releases/download/v0.3.1/MyTypeless-0.3.1-20261018.1015-x64.exe'
+  const feed = yaml.load(buildFeed({ version: '0.3.1', build: '20261018.1015', zipUrl: url, sha512: 'abc==', size: 9, notes: '', date: '2026-10-18T02:15:00.000Z' }))
+  assert.deepEqual(feed.files, [{ url, sha512: 'abc==', size: 9 }])
+  assert.equal('dmgUrl' in feed, false)
+})
+
+test('Windows（D-036）：发布脚本按运行标题找到它触发的构建，与工作流的 run-name 一致', () => {
+  const wf = yaml.load(readFileSync(new URL('../.github/workflows/release-windows.yml', import.meta.url), 'utf-8'))
+  assert.equal(wf['run-name'].replace(/\$\{\{.*\}\}/, 'v0.3.1'), winRunTitle('v0.3.1'))
+  assert.deepEqual(Object.keys(wf.on.workflow_dispatch.inputs).sort(), ['notes', 'sha', 'tag'])
+  const cfg = yaml.load(readFileSync(new URL('../electron-builder.yml', import.meta.url), 'utf-8'))
+  assert.equal(cfg.nsis.oneClick, true)
+  assert.equal(cfg.nsis.perMachine, false) // 装到当前用户，静默更新不需要管理员权限
 })
 
 test('waitForVersion：发布后 latest 地址有缓存，读到旧版本时重读，读到本次版本即返回；次数用完返回最后读到的', async () => {
