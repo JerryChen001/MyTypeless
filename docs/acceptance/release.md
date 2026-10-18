@@ -14,3 +14,4 @@
 | RELE-008 | Given Windows 上已 `npm run setup:win` / When 运行 `npm run dist` / Then `release/` 下生成 `MyTypeless-<版本>-<构建号>-x64.exe`；双击即装到 `%LOCALAPPDATA%\Programs\MyTypeless`（不弹 UAC），开始菜单与桌面有快捷方式，启动后能听写 |
 | RELE-009 | Given 已安装 Windows 版，发布地址的 `latest.yml` 是更大版本号 / When 检查更新 → 下载更新 → 重启并更新 / Then 静默安装新版本并重新打开，设置、历史、模型保留 |
 | RELE-010 | Given 发布者在 Mac 上 / When 运行 `npm run release -- --yes` / Then Mac 文件传完后触发 `release-windows.yml`，Windows 安装包与 `latest.yml` 传到同一个草稿后才转正式；Windows 构建失败时不发布并给出运行地址 |
+| RELE-011 | Given 下载 `MyTypeless-<版本>-<构建号>-x64.zip` / When 解压后运行 `MyTypeless.exe` / Then 不需要安装即可使用，设置与模型与安装版共用；发现新版本时显示「前往下载」，点击打开该版本的 Release 页面，不自动下载或安装 |

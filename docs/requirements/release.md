@@ -18,6 +18,7 @@
 7. 在线更新（D-028、D-032）：已安装的应用读取发布地址 `https://github.com/cjx157791216/MyTypeless/releases/latest/download/latest-mac.yml`（0.2.1 读取旧发布仓库 `cjx157791216/mytypeless-releases` 的同名地址）（最新正式 Release；`src/main/update-info.ts` 的 `DEFAULT_UPDATE_URL`），版本号更大即为新版本；发现后提示，用户确认后在应用内下载 zip（校验 sha512），下载完提示「重启并更新」；录音、会议或纪要整理中拒绝重启；开发运行不检查。
 8. 发布：`npm run release -- --notes "更新内容" --yes`（需要环境变量 `GH_TOKEN`）在代码仓库建 `v<版本号>` 草稿 Release（标签打在构建所用的提交上），上传当前版本最新构建的 zip、DMG 与版本说明，最后转为正式发布，再在旧发布仓库同步一个只含版本说明的 Release（重跑时删掉同版本的旧草稿；同版本已正式发布则拒绝）；打包时有未提交改动、或该提交未合并到 GitHub `main` 时拒绝；版本号不比已发布的大、应用不是证书签名、`release/mac-arm64` 不是这次构建时拒绝。不带 `--yes` 只打印计划（对外分发，人工门禁）。
 9. Windows（D-036）：在 Windows 上 `npm run dist` 编译 Windows 原生助手（`native:win`、`diarize:win`、`whisper:win`）并打包为 `release/MyTypeless-<版本>-<构建号>-x64.exe`（NSIS 一键安装到当前用户，不签名；原生助手随包在 `resources\bin\`）。已安装的应用读取同一发布地址的 `latest.yml`，其余同第 7 条，重启更新时静默安装并重新打开。发布时 `npm run release` 在 Mac 的文件传完后触发 `.github/workflows/release-windows.yml`（按构建所用的提交在 GitHub 的 Windows 机器上打包，`scripts/publish-win.cjs` 把安装包与 `latest.yml` 传到同一个草稿），等它成功且草稿里有这两个文件才转正式；失败时不发布、草稿保留；`--no-windows` 只发 Mac。该工作流不填标签手动运行时只生成构建产物，不碰 Release。
+10. Windows 解压即用版（D-037）：同一次打包另出 `release/MyTypeless-<版本>-<构建号>-x64.zip`，随安装包一起上传到 Release（`npm run release` 核对草稿里三个 Windows 文件都在才转正式）。解压即用版的数据同样在 `%APPDATA%\MyTypeless`；程序旁没有 `Uninstall MyTypeless.exe` 时视为解压即用版，发现新版本只提示，「前往下载」打开该版本的 Release 页面，不自动下载安装。
 
 ## 必测不变量
 

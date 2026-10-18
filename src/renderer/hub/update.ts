@@ -47,7 +47,9 @@ function render(u: UpdateState): void {
       break
     case 'available':
       status.textContent = `有新版本 ${named}`
-      button('下载更新', () => void api.update.download(), 'btn mini primary')
+      // Windows 解压即用版：打开 Release 页面，下载新的 zip 解压覆盖（设置与模型在用户数据目录，不受影响）
+      if (u.manual) button('前往下载', () => void api.update.openDownload(), 'btn mini primary')
+      else button('下载更新', () => void api.update.download(), 'btn mini primary')
       break
     case 'downloading':
       status.textContent = `正在下载新版本 ${u.version} · ${u.percent ?? 0}%${fmtSpeed(u.bytesPerSec)}`

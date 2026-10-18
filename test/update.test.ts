@@ -3,10 +3,10 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
-import { compareVersions as cmp, DEFAULT_UPDATE_URL, friendlyUpdateError, needsManualInstall, pendingIsInstalled, UPDATER_CACHE_DIR, updateUrl } from '../src/main/update-info.ts'
+import { compareVersions as cmp, DEFAULT_UPDATE_URL, friendlyUpdateError, isUnpackedWin, needsManualInstall, pendingIsInstalled, releasePageUrl, UPDATER_CACHE_DIR, updateUrl } from '../src/main/update-info.ts'
 
 const require = createRequire(import.meta.url)
-const { compareVersions, parseArtifact, parseWinArtifact, buildFeed, githubAssetUrl, waitForVersion, winRunTitle } = require('../scripts/publish.cjs')
+const { compareVersions, parseArtifact, parseWinArtifact, parseWinZip, buildFeed, githubAssetUrl, waitForVersion, winRunTitle } = require('../scripts/publish.cjs')
 const yaml = require('js-yaml')
 
 test('发布地址：GitHub 公开仓库最新 Release 的下载目录，MT_UPDATE_URL 只用于本机测试', () => {
@@ -41,6 +41,16 @@ test('更新完成后清理缓存：只删已装上（不比当前新）的安�
   assert.equal(pendingIsInstalled('MyTypeless-0.2.1-20261017.1017-arm64.zip', '0.2.2'), true)
   assert.equal(pendingIsInstalled('MyTypeless-0.2.3-20261017.1017-arm64.zip', '0.2.2'), false) // 已下载、还没重启
   assert.equal(pendingIsInstalled('', '0.2.2'), false)
+})
+
+test('Windows 解压即用版（zip）：程序旁没有卸载程序即为解压即用，只提示新版本、打开 Release 页面手动下载', () => {
+  assert.equal(isUnpackedWin('win32', ['MyTypeless.exe', 'resources', 'locales']), true)
+  assert.equal(isUnpackedWin('win32', ['MyTypeless.exe', 'Uninstall MyTypeless.exe', 'resources']), false) // 安装版
+  assert.equal(isUnpackedWin('darwin', ['MyTypeless']), false)
+  assert.equal(releasePageUrl('0.3.1'), 'https://github.com/cjx157791216/MyTypeless/releases/tag/v0.3.1')
+  assert.deepEqual(parseWinZip('MyTypeless-0.3.1-20261018.1015-x64.zip'), { version: '0.3.1', build: '20261018.1015' })
+  assert.equal(parseWinZip('MyTypeless-0.3.1-20261018.1015-arm64.zip'), null) // macOS 的 zip 不是
+  assert.equal(parseArtifact('MyTypeless-0.3.1-20261018.1015-x64.zip'), null)
 })
 
 test('发布脚本：版本比较与安装包文件名', () => {

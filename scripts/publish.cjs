@@ -54,6 +54,12 @@ function parseWinArtifact(name) {
   return m ? { version: m[1], build: m[2] } : null
 }
 
+/** MyTypeless-0.3.1-20261018.1015-x64.zip → { version, build }（Windows 解压即用版，D-036） */
+function parseWinZip(name) {
+  const m = /^MyTypeless-(\d+\.\d+\.\d+)-(\d{8}\.\d{4})-x64\.zip$/.exec(name)
+  return m ? { version: m[1], build: m[2] } : null
+}
+
 /** GitHub Release 里某个文件的下载地址 */
 function githubAssetUrl(repo, version, file) {
   return `https://github.com/${repo}/releases/download/v${version}/${file}`
@@ -256,7 +262,8 @@ async function buildWindows(token, repo, rel, { sha, tag, notes, ref = 'main' })
   if (run.conclusion !== 'success') throw new Error(`Windows 安装包构建失败（${run.conclusion}）：${run.html_url}；草稿已保留，修好后重跑 npm run release`)
   const names = (await gh(token, 'GET', `/repos/${repo}/releases/${rel.id}/assets?per_page=100`)).map((a) => a.name)
   const exe = names.find((n) => parseWinArtifact(n)?.version === tag.slice(1))
-  if (!exe || !names.includes('latest.yml')) throw new Error(`草稿里没有 Windows 安装包或 latest.yml（现有：${names.join('、')}）`)
+  const zip = names.find((n) => parseWinZip(n)?.version === tag.slice(1))
+  if (!exe || !zip || !names.includes('latest.yml')) throw new Error(`草稿里缺少 Windows 安装包、解压即用版或 latest.yml（现有：${names.join('、')}）`)
   console.log(`  Windows 安装包：${exe}`)
 }
 
@@ -282,7 +289,7 @@ async function release(token, repo, { tag, sha, name, body, files, beforePublish
   return gh(token, 'PATCH', `/repos/${repo}/releases/${rel.id}`, { draft: false, make_latest: 'true' })
 }
 
-module.exports = { compareVersions, parseArtifact, parseWinArtifact, buildFeed, githubAssetUrl, waitForVersion, winRunTitle, githubRepo, sha512, gh, buildWindows }
+module.exports = { compareVersions, parseArtifact, parseWinArtifact, parseWinZip, buildFeed, githubAssetUrl, waitForVersion, winRunTitle, githubRepo, sha512, gh, buildWindows }
 
 if (require.main === module) {
   // 终端设了代理（HTTPS_PROXY）时 Node 的 fetch 默认不走代理，大文件直连 GitHub 会传到一半断开：带上 NODE_USE_ENV_PROXY 重新运行自己
