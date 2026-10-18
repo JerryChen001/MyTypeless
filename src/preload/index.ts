@@ -35,7 +35,8 @@ const api = {
     get: () => ipcRenderer.invoke(IPC.settingsGet),
     set: (patch: unknown) => ipcRenderer.invoke(IPC.settingsSet, patch),
     setKey: (which: 'asr' | 'llm', key: string) => ipcRenderer.invoke(IPC.settingsSetKey, which, key),
-    asrHealth: (baseUrl?: string) => ipcRenderer.invoke(IPC.asrHealth, baseUrl)
+    asrHealth: (baseUrl?: string) => ipcRenderer.invoke(IPC.asrHealth, baseUrl),
+    llmTest: (cfg: { baseUrl: string; model: string; apiKey?: string }) => ipcRenderer.invoke(IPC.llmTest, cfg)
   },
   models: {
     list: () => ipcRenderer.invoke(IPC.modelList),
@@ -108,6 +109,11 @@ const api = {
     rename: (id: number, name: string) => ipcRenderer.invoke(IPC.voiceprintRename, id, name),
     remove: (id: number) => ipcRenderer.invoke(IPC.voiceprintDelete, id),
     model: (action: 'download' | 'cancel' | 'remove') => ipcRenderer.invoke(IPC.speakerModelAction, action)
+  },
+  styleSamples: {
+    list: () => ipcRenderer.invoke(IPC.styleSampleList),
+    remove: (id: number) => ipcRenderer.invoke(IPC.styleSampleDelete, id),
+    clear: () => ipcRenderer.invoke(IPC.styleSampleClear)
   },
   system: {
     checkPermissions: () => ipcRenderer.invoke(IPC.checkPermissions),

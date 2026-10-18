@@ -18,6 +18,7 @@
 | `settingsSet` | `settings.set(patch)` | `Partial<Settings>` 深合并 → 新 `Settings`；同时重注册快捷键、更新登录项 |
 | `settingsSetKey` | `settings.setKey(which, key)` | `'asr' \| 'llm'`、Key（空串表示删除）→ `{ ok, masked }` |
 | `asrHealth` | `settings.asrHealth(baseUrl?)` | → `{ ok, detail? }`（请求 `<baseUrl>/health`） |
+| `llmTest` | `settings.llmTest(cfg)` | `{ baseUrl, model, apiKey? }`（设置页当前填写的值；`apiKey` 为空时用已保存的 Key，会访问钥匙串）→ `{ ok, ms?, error? }`：`ms` 为到第一段输出的耗时，`error` 为给用户看的原因（`describeLlmError`，含服务端原话） |
 | `modelList` | `models.list()` | → `ModelInfo[]`（含是否已安装） |
 | `modelDownload` / `modelCancel` | `models.download(id)` / `models.cancel(id)` | 开始 / 取消下载；进度经 `modelProgress` 推送；取消保留已下载部分 |
 | `modelRemove` | `models.remove(id)` | 删除模型（正在使用时先停引擎）→ 最新 `ModelInfo[]` |
@@ -44,12 +45,13 @@
 | `meetingMergeSpeakers` | `meeting.mergeSpeakers(id, from, into)` | 合并两个说话人 |
 | `meetingSaveMinutes` / `meetingRegenerate` | `meeting.saveMinutes(id, md)` / `meeting.regenerate(id)` | 保存编辑后的纪要 / 重新生成 → `{ ok, error? }` |
 | `meetingSetExpected` | `meeting.setExpected(id, n, track?)` | 改某一路（`track` 0 = 现场 / 麦克风，默认；1 = 线上 / 应用声音）的人数（1～10）并立即按新人数重新区分这一路的说话人，同时记为下次开会的默认人数 → `{ ok, error? }`（较早没有逐句声纹的会议返回 false）（D-020、D-021、D-033） |
-| `meetingAudioApps` | `meeting.audioApps()` | → `{ supported, apps: AudioApp[] }`：可截取声音的正在运行的应用（`{ bundleId, name, audio, output }`，常见会议软件在前）；`supported = false` 表示系统低于 macOS 14.2（D-033） |
+| `meetingAudioApps` | `meeting.audioApps()` | → `{ supported, apps: AudioApp[] }`：可截取声音的正在运行的应用（`{ bundleId, name, audio, output, kind }`，`kind` 为 `call`（通话软件）/ `browser`（网页会议）/ `other`；按通话软件 → 浏览器 → 其他排序，不含 MyTypeless；分类见 `meeting/call-apps.ts`，D-039）；`supported = false` 表示系统低于 macOS 14.2（D-033） |
 | `meetingPrepareAppAudio` | `meeting.prepareAppAudio()` | 开会前先完成「录制系统音频」授权 → `'ready' \| 'waiting' \| 'unsupported'`；`waiting` = 系统授权框还没回应（用户允许后 macOS 会退出并重新打开 MyTypeless，所以必须在开会前）（D-033） |
 | `meetingFinish` | `meeting.finish(id, opts?)` | 整理异常中断的会议：补转写临时录音尾部后照常整理 → `{ ok, error? }` |
 | `meetingExport` | `meeting.exportMarkdown(id)` | 保存对话框，写出纪要 + 完整记录的 Markdown → `boolean` |
 | `speakerModelAction` | `voiceprints.model(action)` | `'download' \| 'cancel' \| 'remove'` → `{ ok, error? }`；进度与状态经 `meetingLive.speakerModel` / `speakerModelProgress` 推送；会议进行或整理中不能删除 |
 | `voiceprintList` / `voiceprintRename` / `voiceprintDelete` | `voiceprints.list/rename/remove` | → 最新 `Voiceprint[]`；改名同步到关联的说话人，删除立即生效（D-016） |
+| `styleSampleList` / `styleSampleDelete` / `styleSampleClear` | `styleSamples.list/remove/clear` | → 最新 `StyleSample[]`（从新到旧）；删除、清空立即生效（D-041） |
 | `answerInsert` | `system.answerInsert(text)` | 隐藏浮卡 → 激活提问时的前台应用 → 粘贴 → `boolean` |
 | `checkPermissions` | `system.checkPermissions()` | → `PermissionStatus { accessibility, microphone, nativeHotkey, permissionHost?, fnKeyConflict }`（开发模式下 `permissionHost` 为实际持有权限的终端应用；`fnKeyConflict` 表示快捷键用到 Fn 但系统 🌐 键不是「无操作」）；非 macOS：`accessibility` 恒为 true，`permissionHost` 为空，`fnKeyConflict` 为 false |
 | `openPermissionSettings` | `system.openPermissionSettings()` | 弹系统授权提示并打开辅助功能设置 |
