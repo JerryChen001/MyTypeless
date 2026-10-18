@@ -20,7 +20,7 @@
 ## 不变量
 
 - 渲染端只能通过 `window.mytypeless`（preload 白名单）访问主进程，不开 `nodeIntegration`。
-- 浮动条窗口不可聚焦（`focusable: false`），永远不抢用户应用的焦点；它在隐藏时也要采集（`backgroundThrottling: false`）。
+- 浮动条窗口不抢用户应用的焦点：macOS `focusable: false`；Windows 上 `focusable: false` 会让按钮点不动，改为可聚焦 + `mt-focus --no-activate` 的“点击不激活”样式，点击仍激活一次时再把前台还给鼠标进入胶囊前的应用（`src/main/index.ts` 的 `createFloatingBar`）；它在隐藏时也要采集（`backgroundThrottling: false`）。
 - 浮动条窗口比胶囊大且默认忽略鼠标（点击穿透）；只有鼠标进入胶囊或提示时才通过 `setBarInteractive` 接收点击。
 - 胶囊各状态由 `.pill` 的 `state-*` 与 `hands-free` 类驱动，样式里不要写死文案。
 - 浮动条 CSP 必须保留 `script-src 'self' blob:`（AudioWorklet 从 blob URL 加载）。

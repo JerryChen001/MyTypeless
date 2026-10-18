@@ -13,6 +13,12 @@ function run(name: string, args: string[], input = '') {
   return { code: r.status, out: r.stdout.toString('utf-8') }
 }
 
+test('mt-focus --no-activate：句柄不合法退出码 2，不是窗口退出码 4（浮动条“点击不激活”样式）', { skip }, () => {
+  assert.equal(run('mt-focus', ['--no-activate', 'abc']).code, 2)
+  assert.equal(run('mt-focus', ['--no-activate', '0']).code, 2)
+  assert.equal(run('mt-focus', ['--no-activate', '4294967294']).code, 4)
+})
+
 // mt-hotkey 的状态机用 --replay 测（不安装钩子）：物理按键无法由程序模拟，钩子本身需要真机验收。
 // "tick" = 单修饰键按住满 HOLD_MS（150ms）
 const HOTKEY_CFG = JSON.stringify({
