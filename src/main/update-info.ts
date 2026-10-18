@@ -32,7 +32,7 @@ export function compareVersions(a: string, b: string): number {
   return 0
 }
 
-/** 缓存里的安装包已装上（版本不比当前新）：可以删掉（约 110MB）。fileName 形如 MyTypeless-0.2.2-20261017.1017-arm64.zip / -x64.exe */
+/** 缓存里的安装包已装上（版本不比当前新）：可以删掉（约 110MB）。fileName 形如 MyTypeless-0.2.2-20261017.1017-arm64.zip / -win-x64.exe */
 export function pendingIsInstalled(fileName: string, current: string): boolean {
   const v = /^MyTypeless-(\d+\.\d+\.\d+)-/.exec(fileName)?.[1]
   return !!v && compareVersions(v, current) <= 0

@@ -4,7 +4,7 @@
  * - 版本号：package.json 的 version（发布新版本时手动升级）
  * - 构建号：打包时的本地时间 YYYYMMDD.HHmm，写进应用（关于、主窗口、托盘）、CFBundleVersion 与安装包文件名
  * - 提交：git 短哈希（有未提交改动时加 -dirty），显示在应用的“关于”里，便于对照代码
- * 产物：macOS release/MyTypeless-<版本>-<构建号>-arm64.dmg / .zip；Windows release/MyTypeless-<版本>-<构建号>-x64.exe（D-036）
+ * 产物：macOS release/MyTypeless-<版本>-<构建号>-arm64.dmg / .zip；Windows release/MyTypeless-<版本>-<构建号>-win-x64.exe（D-036）
  */
 const { execFileSync, execSync } = require('child_process')
 const { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } = require('fs')
@@ -72,4 +72,4 @@ if (win) {
 }
 // 发布（npm run release）据此核对：发布的版本必须对应已合并到 GitHub main、没有未提交改动的提交
 writeFileSync(join(root, 'release/build-info.json'), JSON.stringify({ version, build, sha, dirty }, null, 2) + '\n')
-console.log(`→ release/MyTypeless-${version}-${build}-${win ? 'x64.exe / .zip' : 'arm64.dmg'}`)
+console.log(`→ release/MyTypeless-${version}-${build}-${win ? 'win-x64.exe / .zip' : 'arm64.dmg'}`)
