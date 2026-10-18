@@ -92,6 +92,9 @@ export interface Settings {
   showLiveText: boolean // 说话时在胶囊上方显示识别中的文字；默认关（说话时只显示波形，松手后出结果；停顿时仍在后台识别以缩短等待，D-023）
   learnFromEdits: boolean // 写入后追踪修改、学习改正的词（只读刚插入的那段，D-012）
   learnFrequentTerms: boolean // 统计常用英文专有名词并加入词典（D-012）
+  polishContext: boolean // 润色时参考光标前已有的文字（最多 300 字，随润色请求发给所配置的 LLM，D-040）；默认关
+  learnStyle: boolean // 风格学习：保存写入后被改过的结果，润色时作为示例（D-041）；默认关
+  styleNote: string // 个人风格说明：用户手写的润色要求（D-041）
   appMode: AppMode // 主窗口当前模式：个人（听写）/ 会议（D-015、D-017）
   meetingSpeakers: number // 上次开会选的参会人数（托盘开会也用它；D-021）；麦克风 + 应用声音时为现场人数
   meetingSource: MeetingSource // 上次开会选的声音来源（D-033）
@@ -108,11 +111,15 @@ export type MeetingSource = 'mic' | 'mixed' | 'app'
 export type MeetingTrack = 0 | 1
 
 /** 可截取声音的正在运行的应用（mt-audiotap --apps） */
+/** 能语音通话的软件 / 浏览器（网页会议）/ 其他应用（D-033，`src/main/meeting/call-apps.ts`） */
+export type AudioAppKind = 'call' | 'browser' | 'other'
+
 export interface AudioApp {
   bundleId: string
   name: string
   audio: boolean // 已连接音频（开过声音）
   output: boolean // 此刻正在发声
+  kind: AudioAppKind
 }
 
 /** 应用版本信息：version 来自 package.json；build 为打包时间 YYYYMMDD.HHmm（开发运行为 dev）；commit 为 git 短哈希 */
@@ -205,6 +212,15 @@ export interface MeetingStartOptions {
   expectedRemote?: number | null // 线上（应用声音）人数
 }
 
+/** 风格学习的一条修改记录（D-041）：写入的结果 → 用户改后的样子 */
+export interface StyleSample {
+  id: number
+  createdAt: number
+  appName?: string
+  before: string
+  after: string
+}
+
 export interface Voiceprint {
   id: number
   name: string
@@ -260,6 +276,7 @@ export const IPC = {
   settingsSet: 'mt:settings-set',
   settingsSetKey: 'mt:settings-set-key', // { which: 'asr'|'llm', key: string }
   asrHealth: 'mt:asr-health', // 本地 whisper.cpp server 健康检查
+  llmTest: 'mt:llm-test', // 测试润色 LLM 设置是否连通（用设置页当前填写的值）
 
   // 内置引擎模型
   modelList: 'mt:model-list',
@@ -326,6 +343,9 @@ export const IPC = {
   voiceprintList: 'mt:voiceprint-list',
   voiceprintRename: 'mt:voiceprint-rename',
   voiceprintDelete: 'mt:voiceprint-delete',
+  styleSampleList: 'mt:style-sample-list',
+  styleSampleDelete: 'mt:style-sample-delete',
+  styleSampleClear: 'mt:style-sample-clear',
   speakerModelAction: 'mt:speaker-model-action' // 设置页：声纹模型 download / cancel / remove
 } as const
 

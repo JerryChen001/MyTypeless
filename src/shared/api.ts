@@ -15,6 +15,7 @@ import type {
   UpdateState,
   SessionProgress,
   Settings,
+  StyleSample,
   Voiceprint
 } from './types'
 
@@ -51,6 +52,8 @@ export interface MyTypelessBridge {
     set(patch: Partial<Settings>): Promise<Settings>
     setKey(which: 'asr' | 'llm', key: string): Promise<{ ok: boolean; masked: string }>
     asrHealth(baseUrl?: string): Promise<{ ok: boolean; detail?: string }>
+    /** 测试 LLM 设置是否连通：apiKey 为空时用已保存的 Key → 成功时 ms 为到第一段输出的耗时，失败时 error 为原因 */
+    llmTest(cfg: { baseUrl: string; model: string; apiKey?: string }): Promise<{ ok: boolean; ms?: number; error?: string }>
   }
   models: {
     list(): Promise<ModelInfo[]>
@@ -107,6 +110,12 @@ export interface MyTypelessBridge {
     remove(id: number): Promise<Voiceprint[]>
     /** 声纹模型：下载 / 取消 / 删除；状态经 meeting.onLive 的 speakerModel 推送 */
     model(action: 'download' | 'cancel' | 'remove'): Promise<{ ok: boolean; error?: string }>
+  }
+  /** 风格学习的修改记录（D-041） */
+  styleSamples: {
+    list(): Promise<StyleSample[]>
+    remove(id: number): Promise<StyleSample[]>
+    clear(): Promise<StyleSample[]>
   }
   system: {
     checkPermissions(): Promise<PermissionStatus>

@@ -5,10 +5,11 @@ import { tmpdir } from 'os'
 import { join } from 'path'
 import { IPC, type SessionProgress, type Settings, type FeatureMode, type MeetingLive, type MeetingStartOptions, type MeetingTrack } from '../shared/types'
 import type { PermissionStatus } from '../shared/api'
-import { loadSettings, saveSettings, hasKey, keyMask, setKey, maskKey } from './config'
+import { loadSettings, saveSettings, hasKey, keyMask, setKey, maskKey, getKey } from './config'
+import { LlmPolisher, describeLlmError } from './polish'
 import { DictationSessionManager } from './session'
 import { HotkeyController } from './hotkeys'
-import { listHistory, getHistory, deleteHistory, clearHistory, listWords, addWord, removeWord, historyStats } from './history'
+import { listHistory, getHistory, deleteHistory, clearHistory, listWords, addWord, removeWord, historyStats, listStyleSamples, deleteStyleSample, clearStyleSamples } from './history'
 import { checkAccessibility, injectText, openAccessibilitySettings } from './inject'
 import { activateApp } from './native'
 import { checkLocalAsrHealth } from './providers/asr'
@@ -492,8 +493,10 @@ function registerIpc(): void {
     return s
   })
   ipcMain.handle(IPC.settingsSet, (_e, patch: Partial<Settings>) => {
+    const prev = loadSettings()
     const next = saveSettings(patch)
-    if (!next.learnFromEdits) stopTracking() // 关闭“从修改中学习”：立即停止进行中的追踪
+    // 关闭“从修改中学习”或风格学习：立即停止进行中的追踪（D-012、D-041）
+    if ((prev.learnFromEdits && !next.learnFromEdits) || (prev.learnStyle && !next.learnStyle)) stopTracking()
     // 不再使用内置引擎，或换了模型：释放当前引擎（下次开口按新设置启动）
     const running = whisperEngine.runningModel()
     if (running && (next.asr.provider !== 'builtin' || running !== modelManager.installedPath(selectedModelId(next)))) {
@@ -532,6 +535,18 @@ function registerIpc(): void {
 
   ipcMain.handle(IPC.asrHealth, async (_e, baseUrl?: string) => {
     return checkLocalAsrHealth(baseUrl || loadSettings().asr.baseUrl)
+  })
+
+  // 测试 LLM 设置（设置页当前填写的值，不必先保存）：Key 栏留空时用已保存的 Key（会访问钥匙串）
+  ipcMain.handle(IPC.llmTest, async (_e, cfg: { baseUrl: string; model: string; apiKey?: string }) => {
+    try {
+      const settings = { ...loadSettings(), llm: { baseUrl: cfg.baseUrl, model: cfg.model } }
+      const key = cfg.apiKey?.trim() || (hasKey('llm') ? getKey('llm') : '')
+      const ms = await new LlmPolisher(settings, key, 30_000).ping()
+      return { ok: true, ms }
+    } catch (err) {
+      return { ok: false, error: describeLlmError(err) }
+    }
   })
 
   ipcMain.handle(IPC.historyList, (_e, limit?: number, offset?: number) => listHistory(limit, offset))
@@ -618,6 +633,16 @@ function registerIpc(): void {
   ipcMain.handle(IPC.voiceprintDelete, (_e, id: number) => {
     meetingStore.deleteVoiceprint(id)
     return meetingStore.listVoiceprints()
+  })
+
+  ipcMain.handle(IPC.styleSampleList, () => listStyleSamples())
+  ipcMain.handle(IPC.styleSampleDelete, (_e, id: number) => {
+    deleteStyleSample(id)
+    return listStyleSamples()
+  })
+  ipcMain.handle(IPC.styleSampleClear, () => {
+    clearStyleSamples()
+    return listStyleSamples()
   })
 
   ipcMain.handle(IPC.answerInsert, async (_e, text: string) => {

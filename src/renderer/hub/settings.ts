@@ -1,4 +1,4 @@
-import type { AsrProviderConfig, MeetingLive, ModelInfo, ModelProgress, Settings } from '../../shared/types'
+import type { AsrProviderConfig, MeetingLive, ModelInfo, ModelProgress, Settings, StyleSample } from '../../shared/types'
 import { $, api } from './util'
 import { defaultBindings } from '../../shared/platform'
 
@@ -51,6 +51,9 @@ export async function loadSettingsIntoUi(): Promise<void> {
   ;($('live-preview') as HTMLInputElement).checked = s.showLiveText === true
   ;($('learn-edits') as HTMLInputElement).checked = s.learnFromEdits !== false
   ;($('learn-frequent') as HTMLInputElement).checked = s.learnFrequentTerms !== false
+  ;($('polish-context') as HTMLInputElement).checked = s.polishContext === true
+  ;($('learn-style') as HTMLInputElement).checked = s.learnStyle === true
+  ;($('style-note') as HTMLTextAreaElement).value = s.styleNote ?? ''
   ;($('auto-update') as HTMLInputElement).checked = s.autoCheckUpdates !== false
   await loadMicDevices(s.micDeviceId ?? '')
   ;($('asr-key-state') as HTMLElement).textContent = s.asr.hasApiKey ? `已配置（${s.asr.apiKeyMasked}）` : '未配置'
@@ -278,6 +281,26 @@ $('btn-asr-health').addEventListener('click', async () => {
   state.textContent = r.ok ? `✓ 引擎在线 ${r.detail ?? ''}` : `✗ 不在线（${r.detail ?? 'unknown'}）`
 })
 
+// 测试润色 LLM：用当前填写的地址、模型（与保存时的默认值一致）和 Key（留空则用已保存的）
+$('btn-llm-test').addEventListener('click', async () => {
+  const btn = $('btn-llm-test') as HTMLButtonElement
+  const state = $('llm-test-state') as HTMLElement
+  btn.disabled = true
+  state.className = 'hint'
+  state.textContent = '测试中…'
+  try {
+    const r = await api.settings.llmTest({
+      baseUrl: ($('llm-base-url') as HTMLInputElement).value.trim() || 'https://api.openai.com/v1',
+      model: ($('llm-model') as HTMLInputElement).value.trim() || 'gpt-6-luna',
+      apiKey: ($('llm-key') as HTMLInputElement).value.trim() || undefined
+    })
+    state.classList.add(r.ok ? 'ok' : 'bad')
+    state.textContent = r.ok ? `✓ 连通正常（${((r.ms ?? 0) / 1000).toFixed(1)} 秒）` : `✗ ${r.error ?? '测试失败'}`
+  } finally {
+    btn.disabled = false
+  }
+})
+
 $('btn-save').addEventListener('click', async () => {
   const hotkeyKey = ($('bind-dictation') as HTMLInputElement).value.trim() || defaultBindings(api.platform).hotkeyKey
   const provider = ($('asr-provider') as HTMLSelectElement).value as AsrProviderConfig['provider']
@@ -389,6 +412,79 @@ for (const el of document.querySelectorAll<HTMLInputElement>('input[data-autosav
     savedSettings = await api.settings.set({ [el.dataset.autosave!]: el.checked } as Partial<Settings>)
   })
 }
+
+// —— 润色个性化（D-040、D-041）：默认关闭；打开时说明会读取 / 保存什么、发给谁 ——
+function llmHost(): string {
+  const url = ($('llm-base-url') as HTMLInputElement).value.trim() || savedSettings?.llm.baseUrl || ''
+  try {
+    return new URL(url).host
+  } catch {
+    return url || '所配置的模型服务'
+  }
+}
+
+function consentToggle(id: string, field: 'polishContext' | 'learnStyle', message: () => string): void {
+  const el = $(id) as HTMLInputElement
+  el.addEventListener('change', async () => {
+    if (el.checked && !confirm(message())) {
+      el.checked = false
+      return
+    }
+    savedSettings = await api.settings.set({ [field]: el.checked } as Partial<Settings>)
+  })
+}
+
+consentToggle('polish-context', 'polishContext', () =>
+  `开启后，每次听写会读取光标前最多 300 字，随润色请求发送到 ${llmHost()}，只用于这一次整理，不保存。\n\n密码框不读。确定开启？`
+)
+consentToggle('learn-style', 'learnStyle', () =>
+  `开启后，听写写入后你又改过的内容会保存在本机（最多 50 条，可随时删除），润色时挑最近几条发送到 ${llmHost()} 作参考。\n\n确定开启？`
+)
+$('style-note').addEventListener('change', async () => {
+  savedSettings = await api.settings.set({ styleNote: ($('style-note') as HTMLTextAreaElement).value.trim() })
+})
+
+export async function loadStyleSamples(): Promise<void> {
+  renderStyleSamples(await api.styleSamples.list())
+}
+
+function renderStyleSamples(samples: StyleSample[]): void {
+  const list = $('style-sample-list')
+  list.innerHTML = ''
+  ;($('btn-style-clear') as HTMLButtonElement).disabled = !samples.length
+  if (!samples.length) {
+    const empty = document.createElement('span')
+    empty.className = 'hint'
+    empty.textContent = '还没有修改记录：开启“学习我的修改习惯”后，听写写入后你又改过的内容会出现在这里'
+    list.appendChild(empty)
+    return
+  }
+  for (const x of samples) {
+    const row = document.createElement('div')
+    row.className = 'style-sample-row'
+    row.title = `${new Date(x.createdAt).toLocaleString()}${x.appName ? ` · ${x.appName}` : ''}`
+    const before = document.createElement('span')
+    before.className = 'before'
+    before.textContent = x.before
+    const arrow = document.createElement('span')
+    arrow.className = 'hint'
+    arrow.textContent = '→'
+    const after = document.createElement('span')
+    after.className = 'after'
+    after.textContent = x.after
+    const del = document.createElement('button')
+    del.className = 'btn mini'
+    del.textContent = '删除'
+    del.addEventListener('click', async () => renderStyleSamples(await api.styleSamples.remove(x.id)))
+    row.append(before, arrow, after, del)
+    list.appendChild(row)
+  }
+}
+
+$('btn-style-clear').addEventListener('click', async () => {
+  if (!confirm('清空全部修改记录？之后的润色不再参考它们。')) return
+  renderStyleSamples(await api.styleSamples.clear())
+})
 
 // —— 声纹（D-016）——
 export async function loadVoiceprints(): Promise<void> {
