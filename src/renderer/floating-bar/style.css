@@ -47,7 +47,9 @@ html, body {
 }
 .icon.cancel { background: rgba(255, 255, 255, 0.16); }
 .icon.stop { background: var(--accent); }
-.pill.hands-free.state-recording .icon { display: grid; }
+/* 免手持录音只显示取消与完成（会议的暂停 / 结束按钮同样是 .icon，不能跟着显示） */
+.pill.hands-free.state-recording .icon.cancel,
+.pill.hands-free.state-recording .icon.stop { display: grid; }
 
 .chip {
   font-size: 11px; line-height: 18px; padding: 0 7px; border-radius: 9px;
