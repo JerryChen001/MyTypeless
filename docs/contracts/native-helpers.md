@@ -86,6 +86,7 @@ whisper.cpp（MIT）`whisper-server` 的静态编译版，由 `scripts/build-whi
 | --- | --- |
 | `mt-focus` | stdout：`{"bundleId","name","pid"}`，取不到时为 `{}` |
 | `mt-focus --activate <pid>` | 把该进程的应用切到前台；进程不存在退出码 2 |
+| `mt-focus --no-activate <hwnd>` | **只有 Windows 版**：给该窗口加 `WS_EX_NOACTIVATE`（浮动条用：点击照常送达但不激活窗口）；句柄不合法退出码 2，不是窗口或设置失败 4 |
 | `mt-focus --caret-context <前> <后>` | `前`、`后` 为非负整数且不能都是 0（否则退出码 2）；光标前后各若干字符：`{"text","caret","pid"}`；优先按范围读取（`AXStringForRange`），不支持时读出后只截这一段输出；读不到退出码 5；密码框（`AXSecureTextField`）退出码 5；需要辅助功能权限（否则退出码 3；D-012 追踪修改、D-040 润色上下文、D-041 风格学习） |
 | `mt-focus --selected-text` | 焦点元素的 `AXSelectedText`（base64）；没有选中或应用不支持时退出码 5；需要辅助功能权限（否则退出码 3）；单次辅助功能调用超时 0.3 秒 |
 

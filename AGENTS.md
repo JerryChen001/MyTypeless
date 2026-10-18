@@ -100,6 +100,7 @@ npm run docs:check
 - Windows 读选区 / 光标上下文（`mt-focus`，D-012）：Chromium / Electron 应用要先唤醒辅助功能，且唤醒前已获得焦点的输入框要等光标动一次才可读（真实流程里听写开始时的选区检查负责唤醒，写入后自动词典就能读到）；WinForms 文本框经系统代理“支持”文本模式却读出空串，要退到 `EM_GETSEL` / `WM_GETTEXT`；端到端测试只能对自建窗口操作（脚本发按键前核对前台进程与窗口标题），不能用记事本等真实应用（Windows 11 记事本会恢复用户未关闭的标签页）。
 - Windows 上不能直接 `npm install`：better-sqlite3 没有 Node 24 的 Windows 预编译包（现场编译要 VS 的 ClangCL 组件），Electron 33 的安装脚本在 Node 24 下只解压出第一个文件却报告成功；用 `npm run setup:win`（跳过安装脚本、按 Electron ABI 下载预编译包、解压不完整时用系统 tar）。CI 的 Windows job 只跑 typecheck / test / build，用 `npm ci --ignore-scripts` 即可。Windows 上开发服务器固定监听 127.0.0.1（`localhost` 可能只解析到 `::1`，Electron 连接被拒，窗口白屏）。
 - Windows 安装包（D-036）：electron-builder 给 exe 写图标要用 winCodeSign 工具包，包里有 macOS 符号链接，没开开发者模式的普通用户解压失败、打包中止——`scripts/dist.cjs` 的 `prepareWinCodeSign` 预先解压（跳过 darwin 目录）；Windows 不传 `buildVersion`（文件版本每段最大 65535，放不下 YYYYMMDD 构建号）。安装版与开发版共用 `%APPDATA%\MyTypeless` 和单实例锁：开发版开着时安装版（包括更新后自动重新打开的那次）一启动就把窗口交给开发版并退出，测安装版先关开发版或用 `--user-data-dir`。`workflow_dispatch` 的工作流必须在默认分支上才能被触发：`release-windows.yml` 合并前无法从 `npm run release` 触发。
+- Windows 浮动条：`focusable: false` 的窗口 Chromium 会吞掉点击（悬停有反应、按钮点不动）；可聚焦 + `WS_EX_NOACTIVATE` 后点击能送达，但首次点击仍会激活窗口，要在点击后把前台还给原应用（`BAR_REFOCUS_MS`）。测鼠标要用 `mouse_event` / `SendInput` 产生真实输入：`SetCursorPos` 不经过低级鼠标钩子，Electron 的 `forward` 收不到移动；PowerShell 不感知缩放，坐标用逻辑像素；接点击的测试窗口不要置顶（会被激活后盖住浮动条）。
 
 ## 任务流程
 

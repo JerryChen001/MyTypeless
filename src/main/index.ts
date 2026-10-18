@@ -11,7 +11,7 @@ import { DictationSessionManager } from './session'
 import { HotkeyController } from './hotkeys'
 import { listHistory, getHistory, deleteHistory, clearHistory, listWords, addWord, removeWord, historyStats, listStyleSamples, deleteStyleSample, clearStyleSamples } from './history'
 import { checkAccessibility, injectText, openAccessibilitySettings } from './inject'
-import { activateApp } from './native'
+import { activateApp, getFrontApp, setNoActivate } from './native'
 import { checkLocalAsrHealth } from './providers/asr'
 import { TRAY_ICON_2X_BASE64 } from './tray-icon'
 import { asrLanguage, fireredEngine, modelManager, selectedEngine, selectedModelId, whisperEngine, builtinReady } from './whisper'
@@ -80,6 +80,10 @@ function loadRenderer(win: BrowserWindow, page: string): void {
 
 const preload = join(__dirname, '../preload/index.js')
 
+/** Windows：鼠标进入浮动条胶囊时的前台应用（点击按钮后把焦点还给它）与归还前的等待（等这次点击完成） */
+let barPrevFrontPid = 0
+const BAR_REFOCUS_MS = 300
+
 function createFloatingBar(): BrowserWindow {
   const win = new BrowserWindow({
     // 窗口比胶囊大（留出出错提示的空间），透明区域点击穿透；只有胶囊本身可交互
@@ -97,7 +101,9 @@ function createFloatingBar(): BrowserWindow {
     maximizable: false,
     // macOS 面板窗口（非激活 NSPanel）：能浮在全屏应用上方，且不需要把整个应用变成后台辅助应用
     ...(isMac ? { type: 'panel' } : {}),
-    focusable: false, // 永不抢焦点：注入目标始终是用户正在用的 app
+    // 永不抢焦点：注入目标始终是用户正在用的 app。Windows 上 focusable: false 会让按钮点不动（Chromium 吞掉点击），
+    // 改为可聚焦 + 系统的“点击不激活”样式（下面 setNoActivate），点击照常送达而不激活窗口
+    focusable: process.platform === 'win32',
     acceptFirstMouse: true, // 非焦点窗口上的 ✓/✕ 第一次点击即生效
     hiddenInMissionControl: true,
     webPreferences: {
@@ -111,6 +117,18 @@ function createFloatingBar(): BrowserWindow {
   // skipTransformProcessType：否则 Electron 会把整个应用切成 UIElement（Dock 图标消失、⌘Tab 切不到）
   win.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen: true, skipTransformProcessType: true })
   win.setIgnoreMouseEvents(true, { forward: true })
+  if (process.platform === 'win32') {
+    // 设不上（助手缺失）时退回不可聚焦：按钮点不动，但绝不抢焦点
+    void setNoActivate(win.getNativeWindowHandle().readBigUInt64LE(0)).then((ok) => {
+      if (!ok && !win.isDestroyed()) win.setFocusable(false)
+    })
+    // 点击按钮时 Chromium 仍会把窗口激活一次（系统允许：这是用户的点击）：点击结束后把前台还给鼠标进入胶囊前的应用
+    win.on('focus', () => {
+      setTimeout(() => {
+        if (!win.isDestroyed() && win.isFocused() && barPrevFrontPid) void activateApp(barPrevFrontPid)
+      }, BAR_REFOCUS_MS)
+    })
+  }
   attachRendererDiagnostics(win, 'floating-bar')
   loadRenderer(win, 'floating-bar')
   win.on('closed', () => (floatingBar = null))
@@ -671,6 +689,12 @@ function registerIpc(): void {
   })
   ipcMain.on(IPC.barInteractive, (_e, interactive: boolean) => {
     floatingBar?.setIgnoreMouseEvents(!interactive, { forward: true })
+    // Windows：记下鼠标进入胶囊时的前台应用，点击把浮动条激活后再还给它（见 createFloatingBar）
+    if (interactive && process.platform === 'win32') {
+      void getFrontApp().then((f) => {
+        if (f.pid && f.pid !== process.pid) barPrevFrontPid = f.pid
+      })
+    }
   })
   ipcMain.handle(IPC.openPermissionSettings, async () => {
     await checkAccessibility(true) // 系统弹窗引导，并把本 app 加入辅助功能列表

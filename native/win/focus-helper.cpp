@@ -2,6 +2,7 @@
 //   mt-focus                          → {"bundleId","name","pid"}：前台窗口所属程序；取不到时 {}
 //                                       bundleId 用小写 exe 文件名（如 code.exe），name 用程序的文件描述（如 Visual Studio Code）
 //   mt-focus --activate <pid>         → 把该进程的窗口切到前台；进程不存在退出码 2，切换失败 4
+//   mt-focus --no-activate <hwnd>     → 给该窗口加 WS_EX_NOACTIVATE（Windows 专有，浮动条用）：句柄不合法退出码 2，不是窗口 / 设置失败 4
 //   mt-focus --selected-text          → 焦点输入框中选中文字的 base64（UI Automation，不碰剪贴板）；没有选中 / 不支持 / 密码框退出码 5
 //   mt-focus --caret-context <前> <后> → {"text","caret","pid"}：光标前后各若干字符（自动词典追踪修改用，D-012）；
 //                                       只输出这一段；不支持 / 密码框退出码 5。两者在目标应用没响应时超时也按 5 处理
@@ -283,6 +284,18 @@ int wmain(int argc, wchar_t **argv) {
     if (!pid || (end && *end)) return 2;
     return Activate((DWORD)pid);
   }
+  if (argc == 3 && wcscmp(argv[1], L"--no-activate") == 0) {
+    // 浮动条（Windows 专有）：Electron 的 focusable: false 会让 Chromium 吞掉点击（按钮点不动），
+    // 所以窗口设为可聚焦，再由这里加上 WS_EX_NOACTIVATE——点击照常送达，但不激活、不抢用户应用的焦点
+    wchar_t *end = nullptr;
+    unsigned long long h = wcstoull(argv[2], &end, 10);
+    if (!h || (end && *end)) return 2;
+    HWND hwnd = (HWND)(uintptr_t)h;
+    if (!IsWindow(hwnd)) return 4;
+    LONG_PTR ex = GetWindowLongPtrW(hwnd, GWL_EXSTYLE);
+    SetWindowLongPtrW(hwnd, GWL_EXSTYLE, ex | WS_EX_NOACTIVATE);
+    return (GetWindowLongPtrW(hwnd, GWL_EXSTYLE) & WS_EX_NOACTIVATE) ? 0 : 4;
+  }
   if (argc == 2 && wcscmp(argv[1], L"--selected-text") == 0) {
     UiaJob job;
     return RunUia(job, 800); // 调用方超时 1 秒
@@ -298,6 +311,6 @@ int wmain(int argc, wchar_t **argv) {
     job.after = (int)after;
     return RunUia(job, 1200); // 调用方超时 1.5 秒
   }
-  fputs("usage: mt-focus [--activate <pid> | --selected-text | --caret-context <before> <after>]\n", stderr);
+  fputs("usage: mt-focus [--activate <pid> | --no-activate <hwnd> | --selected-text | --caret-context <before> <after>]\n", stderr);
   return 2;
 }

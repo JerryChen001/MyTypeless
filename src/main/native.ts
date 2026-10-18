@@ -66,6 +66,15 @@ export async function activateApp(pid: number): Promise<boolean> {
   })
 }
 
+/** Windows：给窗口加“点击不激活”样式（浮动条：按钮点得动、又不抢用户应用的焦点）；成功返回 true */
+export async function setNoActivate(hwnd: bigint): Promise<boolean> {
+  const bin = helperPath('mt-focus')
+  if (!bin || process.platform !== 'win32') return false
+  return new Promise((resolve) => {
+    execFile(bin, ['--no-activate', hwnd.toString()], { timeout: 2000 }, (err) => resolve(!err))
+  })
+}
+
 /** 焦点输入框中选中的文字（辅助功能 API，不碰剪贴板）；没有选中或应用不支持时为 null */
 export async function getSelectedTextAX(): Promise<string | null> {
   const bin = helperPath('mt-focus')
