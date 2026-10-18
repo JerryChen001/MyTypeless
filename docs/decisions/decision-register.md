@@ -42,6 +42,7 @@
 | D-034 | [听写管线](domains/pipeline.md) | 识别结果没有实际内容（空、幻觉、只有语气词/标点）时不调用 LLM、不写入，提示“没有识别到内容” | 2026-10-17 |
 | D-035 | [原生层](domains/native.md) | 开始 Windows 移植（修订 D-006）；Windows 默认主键右 Ctrl（翻译右 Ctrl+Shift、提问右 Ctrl+空格），可改为右 Shift / 右 Alt | 2026-10-17 |
 | D-036 | [打包发布](domains/release.md) | Windows 安装包（NSIS 一键装到当前用户，无签名）与在线更新；发布时由 GitHub Actions 打 Windows 包，发布者不需要 Windows 电脑 | 2026-10-17 |
+| D-037 | [打包发布](domains/release.md) | Windows 解压即用版（zip）：数据与安装版共用 %APPDATA%，新版本只提示、手动下载 | 2026-10-17 |
 
 ## 默认架构
 
