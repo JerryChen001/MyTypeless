@@ -12,15 +12,21 @@ import { ModelManager } from './models'
 /**
  * 内置本地识别（D-009）：随包的引擎 + 用户下载的模型。
  * - whisper 模型：mt-whisper（whisper.cpp，GPU）
- * - FireRedASR2（中文默认，D-027）：mt-diarize（sherpa-onnx，CPU 4 线程），带标点模型；常驻 10 分钟以保持低延迟
+ * - FireRedASR2（中文默认，D-027）：mt-diarize（sherpa-onnx，CPU；macOS 4 线程、Windows 1 线程，见 FIRERED_THREADS），带标点模型；常驻 10 分钟以保持低延迟
  */
 
 export const whisperEngine = new WhisperEngine()
 export const modelManager = new ModelManager()
 
+/**
+ * FireRedASR2 识别线程数。Windows 实测（i7-1065G7，11 秒音频）：1 线程 8.6 秒 / 占 1.0 核，4 线程 8.9 秒 / 占 3.2 核——
+ * 多开线程不快，只是多占 CPU，开会时抢走声纹、降噪与会议软件的时间。macOS 保持 4
+ */
+export const FIRERED_THREADS = process.platform === 'win32' ? 1 : 4
+
 let fireredDir: string | null = null // 当前要加载的 FireRedASR2 模型目录（启动进程时读取）
 export const fireredEngine = new SherpaHelper({
-  args: () => (fireredDir ? ['--firered', fireredDir, '--punct', join(fireredDir, 'punct.int8.onnx'), '--threads', '4'] : null),
+  args: () => (fireredDir ? ['--firered', fireredDir, '--punct', join(fireredDir, 'punct.int8.onnx'), '--threads', String(FIRERED_THREADS)] : null),
   idleMs: 10 * 60_000,
   nice: 0
 })

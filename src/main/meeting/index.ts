@@ -31,6 +31,8 @@ import { normalizeLoudness } from './enhance'
 import { buildTranscript, cleanMinutesBody, generateMinutesBody, minutesHeader } from './minutes'
 import {
   MEETING_VAD,
+  denoiseLagging,
+  overloaded,
   MEETING_VAD_DENOISED,
   UtteranceSegmenter,
   alignPad,
@@ -77,6 +79,7 @@ interface Track {
   segmenter: UtteranceSegmenter
   clusterer: OnlineClusterer
   denoise: boolean // 本路是否边录边降噪（只有麦克风；开会时降噪模型已就绪）
+  denoiseStopped?: boolean // 降噪跟不上、会议中途改用原始录音分句（之前分出的句子仍是降噪后的声音）
   dnChain: Promise<void> // 降噪与分句（按录音顺序串行）
   dnSent: number // 已送去降噪的样本数
   segFed: number // 已送入分句的样本数（降噪输出或原始录音）
@@ -108,6 +111,8 @@ interface Active {
   embedOk: number // 声纹计算成功 / 失败次数：一直失败时提示，不再悄悄全部“未区分”
   embedFailed: number
   echoNoticed: boolean // 已提示过外放回声
+  pending: number // 已分出、还没识别完的句子数（积压）
+  overloadNoticed: boolean // 已提示过电脑忙、降级处理
 }
 
 export interface MeetingHooks {
@@ -260,7 +265,9 @@ export class MeetingManager {
       lastRegroupAt: Date.now(),
       embedOk: 0,
       embedFailed: 0,
-      echoNoticed: false
+      echoNoticed: false,
+      pending: 0,
+      overloadNoticed: false
     }
     this.active = a
     this.startCapture(a, appBundleId)
@@ -329,12 +336,37 @@ export class MeetingManager {
       console.warn('[meeting] write audio failed:', err)
     }
     t.written += pcm.length
+    if (t.denoise && denoiseLagging(t.written, t.segFed)) this.stopDenoising(a, t)
     if (!t.denoise) {
-      for (const u of t.segmenter.push(pcm)) this.onUtterance(a, t, u)
-      t.segFed = t.written
+      if (t.segFed + pcm.length === t.written) {
+        for (const u of t.segmenter.push(pcm)) this.onUtterance(a, t, u)
+        t.segFed = t.written
+      } else {
+        // 降噪排队中途停用：接在队尾、从临时录音读原始音频送入分句，保证时间线顺序
+        const upTo = t.written
+        t.dnChain = t.dnChain.then(() => this.feedSegmenter(a, t, null, upTo))
+      }
       return
     }
     if (t.written - t.dnSent >= DENOISE_BATCH) this.sendToDenoiser(a, t)
+  }
+
+  /**
+   * 降噪（低优先级）跟不上录音：这一路改用原始录音分句（换回原始录音的 VAD 门槛），排队中还没降噪的部分也直接用原始录音。
+   * 慢 CPU 上开会时 CPU 被识别与会议软件占满，降噪进程分不到时间，整路分不出句子、实时转写停住，结束后还要补完全部积压
+   */
+  private stopDenoising(a: Active, t: Track): void {
+    t.denoise = false
+    t.denoiseStopped = true
+    t.segmenter.useVad(MEETING_VAD)
+    console.warn('[meeting] denoiser lagging, track', t.track, 'falls back to raw audio')
+    this.noticeOverload(a)
+  }
+
+  private noticeOverload(a: Active): void {
+    if (a.overloadNoticed) return
+    a.overloadNoticed = true
+    this.flash('电脑较忙：已简化降噪与说话人细分，优先保证实时转写', 10_000)
   }
 
   /** 把还没送出的录音送去降噪，结果按顺序送入分句（D-024） */
@@ -343,7 +375,9 @@ export class MeetingManager {
     const count = t.written - start
     if (count <= 0) return
     t.dnSent = t.written
-    t.dnChain = t.dnChain.then(async () => this.feedSegmenter(a, t, await denoiser.denoiseFeed(t.audioPath, start, count).catch(() => null), start + count))
+    t.dnChain = t.dnChain.then(async () =>
+      this.feedSegmenter(a, t, t.denoise ? await denoiser.denoiseFeed(t.audioPath, start, count).catch(() => null) : null, start + count)
+    )
   }
 
   /** 暂停、结束：送出剩余录音、取回降噪器里剩下的部分、结束正在说的一句；返回分出的句子都已交给 onUtterance 的 Promise */
@@ -634,7 +668,13 @@ export class MeetingManager {
    */
   private processUtterance(a: Active, t: Track, u: Utterance): void {
     const whole: Part[] = [{ start: u.start, end: u.end }]
-    const canSplit = t.expected > 1 && speakerModel.ready() && samplesToMs(u.end - u.start) >= MIN_SPLIT_MS
+    let canSplit = t.expected > 1 && speakerModel.ready() && samplesToMs(u.end - u.start) >= MIN_SPLIT_MS
+    // 积压太多（电脑忙）：只算整句声纹，不做句内换人切分，让识别先跟上
+    if (canSplit && overloaded(a.pending)) {
+      canSplit = false
+      this.noticeOverload(a)
+    }
+    a.pending++
     // 已经区分出几个人（各至少说过 KNOWN_MIN_SEGMENTS 句）：按窗口与各人比较找换人位置（D-025）；
     // 会议刚开始还不知道各人的声音：用分段模型，带上句子前面一段录音做参考（分段模型在几秒的短片段里分不清人）
     const byWindows = canSplit && t.clusterer.countWith(KNOWN_MIN_SEGMENTS) >= 2
@@ -661,33 +701,43 @@ export class MeetingManager {
       return parts.length > 1 && !byWindows ? mergeAdjacentParts(voiced) : voiced
     })
     a.asrChain = a.asrChain.then(async () => {
-      for (const p of await planned) {
-        // 识别用原始录音（降噪后的声音只用于分句：弱的人声会被一起削掉，D-024），音量归一后识别
-        const pcm = normalizeLoudness(t.denoise ? readRange(t.audioPath, p.start, p.end) : u.pcm.subarray(p.start - u.start, p.end - u.start))
-        let text: string
-        try {
-          text = (await a.asr.transcribe(pcm16ToWav(pcm, SAMPLE_RATE, 1), { vocabulary: a.words })).text.trim()
-        } catch (err) {
-          console.warn('[meeting] transcribe failed:', err)
-          t.failed.push([p.start, p.end])
-          continue
-        }
-        if (!text || isHallucination(text)) continue
-        const v = p.v
-        if (v) a.embedOk++
-        else if (speakerModel.ready() && samplesToMs(p.end - p.start) >= MIN_EMBED_MS && ++a.embedFailed === 3 && !a.embedOk) {
-          this.flash('说话人区分暂时不可用（声纹计算失败），本场会议先只转写；结束后可手动标注说话人')
-        }
-        const speakerId = v ? this.assignSpeaker(a, t, v) : t.lastSpeaker
-        const id = store.addSegment(a.id, { speakerId, startSample: p.start, endSample: p.end, text, embedding: v, track: t.track })
-        if (v) a.embeddings.set(id, v)
-        t.lastSpeaker = speakerId
-        t.newSegments++
-        this.hooks.onChanged(a.id)
+      try {
+        await this.transcribeParts(a, t, u, await planned)
+      } finally {
+        a.pending--
       }
     })
     // 声纹模型在会议中途下载完成：补做之前没有说话人的句子
     if (speakerModel.ready()) void a.asrChain.then(() => this.backfillIfNeeded(a))
+  }
+
+  /** 识别一句话切出的各段并落库（会议 asrChain 串行调用） */
+  private async transcribeParts(a: Active, t: Track, u: Utterance, parts: VoicedPart[]): Promise<void> {
+    for (const p of parts) {
+      // 识别用原始录音（降噪后的声音只用于分句：弱的人声会被一起削掉，D-024），音量归一后识别
+      // 降噪中途停用前分出的句子仍是降噪后的声音：同样从临时录音读原始音频
+      const pcm = normalizeLoudness(t.denoise || t.denoiseStopped ? readRange(t.audioPath, p.start, p.end) : u.pcm.subarray(p.start - u.start, p.end - u.start))
+      let text: string
+      try {
+        text = (await a.asr.transcribe(pcm16ToWav(pcm, SAMPLE_RATE, 1), { vocabulary: a.words })).text.trim()
+      } catch (err) {
+        console.warn('[meeting] transcribe failed:', err)
+        t.failed.push([p.start, p.end])
+        continue
+      }
+      if (!text || isHallucination(text)) continue
+      const v = p.v
+      if (v) a.embedOk++
+      else if (speakerModel.ready() && samplesToMs(p.end - p.start) >= MIN_EMBED_MS && ++a.embedFailed === 3 && !a.embedOk) {
+        this.flash('说话人区分暂时不可用（声纹计算失败），本场会议先只转写；结束后可手动标注说话人')
+      }
+      const speakerId = v ? this.assignSpeaker(a, t, v) : t.lastSpeaker
+      const id = store.addSegment(a.id, { speakerId, startSample: p.start, endSample: p.end, text, embedding: v, track: t.track })
+      if (v) a.embeddings.set(id, v)
+      t.lastSpeaker = speakerId
+      t.newSegments++
+      this.hooks.onChanged(a.id)
+    }
   }
 
   private backfilling = false

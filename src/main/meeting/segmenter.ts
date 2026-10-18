@@ -20,6 +20,23 @@ export const MEETING_VAD: VadOptions = { floor: 250, ratio: 3 } // 会议用原�
 // 模拟远处说话（小 18 dB、带混响）在偏吵的房间里，原始录音 + 原参数漏掉一半的句子，降噪后 + 此参数没有整句漏掉
 export const MEETING_VAD_DENOISED: VadOptions = { floor: 60, ratio: 2 }
 
+/**
+ * 电脑忙不过来时的降级（慢 CPU 上开会，识别、声纹、降噪加上会议软件把 CPU 占满）：
+ * - 降噪（低优先级进程）落后录音超过 DENOISE_MAX_LAG：这一路改用原始录音分句（MEETING_VAD）。降噪只用于分句（D-024），
+ *   跟不上时整路分不出句子，实时转写停住，结束后还要把积压的录音全部降噪一遍
+ * - 排队等声纹与识别的句子超过 OVERLOAD_PENDING：新句子不再做句内换人切分（D-025 的窗口比较 / 分段模型），只算整句声纹
+ */
+export const DENOISE_MAX_LAG = 8 * SAMPLE_RATE
+export const OVERLOAD_PENDING = 3
+
+export function denoiseLagging(written: number, segFed: number): boolean {
+  return written - segFed > DENOISE_MAX_LAG
+}
+
+export function overloaded(pending: number): boolean {
+  return pending > OVERLOAD_PENDING
+}
+
 export interface Utterance {
   start: number // 样本下标（含）
   end: number // 样本下标（不含）
@@ -27,7 +44,7 @@ export interface Utterance {
 }
 
 export class UtteranceSegmenter {
-  private readonly vad: Vad
+  private vad: Vad
   private pending = new Int16Array(0)
   private total = 0 // 已过 VAD 的样本数（时间线位置）
   /** 保留的音频：从 bufStart 开始（只保留当前句及句首前的一小段） */
@@ -75,6 +92,11 @@ export class UtteranceSegmenter {
     }
     this.vad.silentRun = 0
     return out
+  }
+
+  /** 换 VAD 门槛（降噪跟不上、改用原始录音分句时）；时间线位置与正在说的句子保持不变 */
+  useVad(vad: VadOptions): void {
+    this.vad = new Vad(vad)
   }
 
   /** 当前时间线位置（样本） */
