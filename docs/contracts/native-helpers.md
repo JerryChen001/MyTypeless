@@ -52,7 +52,7 @@ whisper.cpp（MIT）`whisper-server` 的静态编译版，由 `scripts/build-whi
 
 `native/diarize-helper.c`（原创）静态链接 sherpa-onnx（Apache-2.0）与 ONNX Runtime（MIT），由 `scripts/build-diarize.sh` 构建。由 `src/main/meeting/diarizer.ts` 管理：
 
-- 启动：会议用两个进程——声纹 `mt-diarize --model <声纹模型.onnx> --segmentation <分段模型.onnx> --threads 2 [--turn-threshold 0.7]`，降噪 `mt-diarize --denoiser <gtcrn_simple.onnx> --threads 1`；内置中文识别另一个进程 `mt-diarize --firered <模型目录> --punct <标点模型.onnx> --threads 4`（D-027，正常优先级、闲置 10 分钟退出）；至少给一个模型；就绪时 stdout 输出 `{"ready":true,"dim":<维度，无声纹模型为 0>,"turns":<bool>,"denoise":<bool>,"asr":<bool>}`（启动超时 20 秒）；调度优先级 nice 15
+- 启动：会议用两个进程——声纹 `mt-diarize --model <声纹模型.onnx> --segmentation <分段模型.onnx> --threads 2 [--turn-threshold 0.7]`，降噪 `mt-diarize --denoiser <gtcrn_simple.onnx> --threads 1`；内置中文识别另一个进程 `mt-diarize --firered <模型目录> --punct <标点模型.onnx> --threads 4`（Windows `--threads 1`：实测多线程不快、只多占 CPU）（D-027，正常优先级、闲置 10 分钟退出）；至少给一个模型；就绪时 stdout 输出 `{"ready":true,"dim":<维度，无声纹模型为 0>,"turns":<bool>,"denoise":<bool>,"asr":<bool>}`（启动超时 20 秒）；调度优先级 nice 15
 - 命令（stdin 每行一条；**文件路径放最后、取到行尾**——真实路径含空格，如 `Application Support`）：`embed <起始样本> <样本数> <pcm 文件>`，从会议临时录音（16kHz 单声道 s16le）读取该段（最长 60 秒）
 - 命令 `turns <起始样本> <样本数> <pcm 文件>`：对该段做 sherpa-onnx 离线说话人区分（分段 + 句内聚类），返回 `{"ok":true,"turns":[[起,止,说话人],...]}`（相对该段的样本下标；说话人标签只在该段内有意义，仅用来找换人位置）。主进程对每句话带上前面 8 秒录音调用
 - 命令 `dnfeed <起始样本> <样本数> <pcm 文件>`：把该段接着送入流式降噪（GTCRN），返回已能输出的部分 `{"ok":true,"at":<首个输出样本在录音时间线上的位置>,"pcm":"<base64 s16le>"}`；输出与输入按样本对齐（实测无额外延迟），可能比输入少（缓冲到下次输出）；起始样本与上次结尾不连续时先重置。`dnflush`（单独一行）输出剩余部分并重置（输出可能比输入略长，调用方截到录音结尾）。`denoise <起始样本> <样本数> <pcm 文件>`：整段降噪，返回 `{"ok":true,"pcm":"..."}`
