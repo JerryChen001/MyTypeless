@@ -41,6 +41,8 @@ mac:
 # Windows（D-036）：安装包一键安装到当前用户（%LOCALAPPDATA%\Programs，不要管理员权限）；没有代码签名证书
 win:
   icon: build/icon.png
+  # 文件名带操作系统（win-x64），与其他平台的同架构包区分开
+  artifactName: ${productName}-${version}-${env.MT_BUILD}-win-${arch}.${ext}
   extraResources:
     - from: native/bin
       to: bin

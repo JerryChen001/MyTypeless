@@ -48,9 +48,9 @@ test('Windows 解压即用版（zip）：程序旁没有卸载程序即为解压
   assert.equal(isUnpackedWin('win32', ['MyTypeless.exe', 'Uninstall MyTypeless.exe', 'resources']), false) // 安装版
   assert.equal(isUnpackedWin('darwin', ['MyTypeless']), false)
   assert.equal(releasePageUrl('0.3.1'), 'https://github.com/cjx157791216/MyTypeless/releases/tag/v0.3.1')
-  assert.deepEqual(parseWinZip('MyTypeless-0.3.1-20261018.1015-x64.zip'), { version: '0.3.1', build: '20261018.1015' })
+  assert.deepEqual(parseWinZip('MyTypeless-0.3.1-20261018.1015-win-x64.zip'), { version: '0.3.1', build: '20261018.1015' })
   assert.equal(parseWinZip('MyTypeless-0.3.1-20261018.1015-arm64.zip'), null) // macOS 的 zip 不是
-  assert.equal(parseArtifact('MyTypeless-0.3.1-20261018.1015-x64.zip'), null)
+  assert.equal(parseArtifact('MyTypeless-0.3.1-20261018.1015-win-x64.zip'), null)
 })
 
 test('发布脚本：版本比较与安装包文件名', () => {
@@ -89,11 +89,12 @@ test('发布脚本：版本说明是 electron-updater 能读的格式（zip 绝�
 })
 
 test('Windows（D-036）：安装包文件名解析；版本说明没有 DMG 地址，安装包为绝对地址', () => {
-  assert.deepEqual(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-x64.exe'), { version: '0.3.1', build: '20261018.1015' })
-  assert.equal(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-x64.exe.blockmap'), null)
+  assert.deepEqual(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-win-x64.exe'), { version: '0.3.1', build: '20261018.1015' })
+  assert.equal(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-win-x64.exe.blockmap'), null)
+  assert.equal(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-x64.exe'), null) // 文件名必须带操作系统
   assert.equal(parseWinArtifact('MyTypeless-0.3.1-20261018.1015-arm64.zip'), null)
-  assert.equal(parseArtifact('MyTypeless-0.3.1-20261018.1015-x64.exe'), null) // Mac 的发布流程不会拿到 Windows 安装包
-  const url = 'https://github.com/o/r/releases/download/v0.3.1/MyTypeless-0.3.1-20261018.1015-x64.exe'
+  assert.equal(parseArtifact('MyTypeless-0.3.1-20261018.1015-win-x64.exe'), null) // Mac 的发布流程不会拿到 Windows 安装包
+  const url = 'https://github.com/o/r/releases/download/v0.3.1/MyTypeless-0.3.1-20261018.1015-win-x64.exe'
   const feed = yaml.load(buildFeed({ version: '0.3.1', build: '20261018.1015', zipUrl: url, sha512: 'abc==', size: 9, notes: '', date: '2026-10-18T02:15:00.000Z' }))
   assert.deepEqual(feed.files, [{ url, sha512: 'abc==', size: 9 }])
   assert.equal('dmgUrl' in feed, false)
@@ -106,6 +107,7 @@ test('Windows（D-036）：发布脚本按运行标题找到它触发的构建�
   const cfg = yaml.load(readFileSync(new URL('../electron-builder.yml', import.meta.url), 'utf-8'))
   assert.equal(cfg.nsis.oneClick, true)
   assert.equal(cfg.nsis.perMachine, false) // 装到当前用户，静默更新不需要管理员权限
+  assert.match(cfg.win.artifactName, /-win-\$\{arch\}\.\$\{ext\}$/) // 与发布脚本解析的文件名一致
 })
 
 test('waitForVersion：发布后 latest 地址有缓存，读到旧版本时重读，读到本次版本即返回；次数用完返回最后读到的', async () => {
