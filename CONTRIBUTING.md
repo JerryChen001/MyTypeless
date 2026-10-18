@@ -24,7 +24,7 @@
 - `npm run whisper:win` 编译 `mt-whisper`（多语种识别，whisper.cpp 源码，需要 git；只用 CPU）
 - Windows 默认主键是右 Ctrl（按住约 0.15 秒开始说话、轻按免手持；右 Ctrl+空格 提问；右 Ctrl+Shift 翻译）。没有右 Ctrl 的键盘在设置里改为 `rshift`（翻译 `rshift+ctrl`，右 Shift+字母照常打大写）或 `ralt`
 - 提交前同样跑 `npm run typecheck`、`npm run test`、`npm run build`、`npm run docs:check`（CI 有 Windows job）
-- `npm run dist` 在 Windows 上打包为 `release/MyTypeless-<版本>-<构建号>-x64.exe`（一键安装到当前用户，不签名）；没有 Windows 电脑时可在 Actions 页面手动运行 `release-windows`（标签留空），从构建产物下载安装包
+- `npm run dist` 在 Windows 上打包为 `release/MyTypeless-<版本>-<构建号>-win-x64.exe`（一键安装到当前用户，不签名）；没有 Windows 电脑时可在 Actions 页面手动运行 `release-windows`（标签留空），从构建产物下载安装包
 
 ## 提交流程
 

@@ -48,15 +48,15 @@ function parseArtifact(name) {
   return m ? { version: m[1], build: m[2], ext: m[3] } : null
 }
 
-/** MyTypeless-0.3.1-20261018.1015-x64.exe → { version, build }（Windows 安装包，D-036） */
+/** MyTypeless-0.3.1-20261018.1015-win-x64.exe → { version, build }（Windows 安装包，D-036） */
 function parseWinArtifact(name) {
-  const m = /^MyTypeless-(\d+\.\d+\.\d+)-(\d{8}\.\d{4})-x64\.exe$/.exec(name)
+  const m = /^MyTypeless-(\d+\.\d+\.\d+)-(\d{8}\.\d{4})-win-x64\.exe$/.exec(name)
   return m ? { version: m[1], build: m[2] } : null
 }
 
-/** MyTypeless-0.3.1-20261018.1015-x64.zip → { version, build }（Windows 解压即用版，D-036） */
+/** MyTypeless-0.3.1-20261018.1015-win-x64.zip → { version, build }（Windows 解压即用版，D-036） */
 function parseWinZip(name) {
-  const m = /^MyTypeless-(\d+\.\d+\.\d+)-(\d{8}\.\d{4})-x64\.zip$/.exec(name)
+  const m = /^MyTypeless-(\d+\.\d+\.\d+)-(\d{8}\.\d{4})-win-x64\.zip$/.exec(name)
   return m ? { version: m[1], build: m[2] } : null
 }
 
