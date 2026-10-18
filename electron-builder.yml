@@ -13,13 +13,15 @@ asar: true
 asarUnpack:
   - "**/*.node"
 extraResources:
-  - from: native/bin
-    to: bin
-    filter:
-      - "*"
   - from: build/THIRD_PARTY_NOTICES.md
     to: THIRD_PARTY_NOTICES.md
 mac:
+  extraResources:
+    - from: native/bin
+      to: bin
+      filter:
+        - "*"
+        - "!*.exe"
   icon: build/icon.icns
   category: public.app-category.productivity
   identity: null
@@ -36,6 +38,23 @@ mac:
     - target: zip
       arch:
         - arm64
+# Windows（D-036）：一键安装到当前用户（%LOCALAPPDATA%\Programs，不要管理员权限）；没有代码签名证书
+win:
+  icon: build/icon.png
+  extraResources:
+    - from: native/bin
+      to: bin
+      filter:
+        - "mt-*.exe"
+        - "!*.old-*"
+  target:
+    - target: nsis
+      arch:
+        - x64
+nsis:
+  oneClick: true
+  perMachine: false
+  deleteAppDataOnUninstall: false
 # 在线更新（D-028）：生成 Contents/Resources/app-update.yml（electron-updater 下载时要读其中的缓存目录名）。
 # 地址必须与 src/main/update-info.ts 的 DEFAULT_UPDATE_URL 一致（test/update.test.ts 校验）；上传由 npm run release 完成
 publish:

@@ -6,8 +6,9 @@ import type { UpdateState } from '../shared/types'
 import { friendlyUpdateError, pendingIsInstalled, UPDATE_FIRST_CHECK_MS, UPDATE_INTERVAL_MS, UPDATER_CACHE_DIR, updateUrl } from './update-info'
 
 /**
- * 在线更新（D-028）：定时检查发布地址的 latest-mac.yml → 发现新版本时提示 → 用户确认后应用内下载 →
- * 下载完提示重启更新（Squirrel.Mac 替换应用，要求新版本与当前应用签名证书相同）。
+ * 在线更新（D-028）：定时检查发布地址的版本说明（macOS latest-mac.yml、Windows latest.yml）→ 发现新版本时提示 →
+ * 用户确认后应用内下载 → 下载完提示重启更新（macOS 由 Squirrel.Mac 替换应用，要求新版本与当前应用签名证书相同；
+ * Windows 静默运行新版本的安装包，D-036）。
  * 只读取发布地址的版本说明和安装包，不发送任何用户数据。
  */
 export interface UpdaterOptions {
@@ -58,7 +59,9 @@ function notify(title: string, body: string): void {
 
 /** 更新完成后删掉缓存里已装上的安装包（electron-updater 要等下一次下载才清理） */
 function cleanInstalledDownload(): void {
-  const dir = join(app.getPath('home'), 'Library/Caches', UPDATER_CACHE_DIR, 'pending')
+  // electron-updater 的缓存目录：macOS ~/Library/Caches/<名>，Windows %LOCALAPPDATA%\<名>
+  const cache = process.platform === 'win32' ? (process.env.LOCALAPPDATA ?? join(app.getPath('home'), 'AppData', 'Local')) : join(app.getPath('home'), 'Library/Caches')
+  const dir = join(cache, UPDATER_CACHE_DIR, 'pending')
   try {
     const info = JSON.parse(readFileSync(join(dir, 'update-info.json'), 'utf-8')) as { fileName?: string }
     if (pendingIsInstalled(info.fileName ?? '', app.getVersion())) {
@@ -71,11 +74,11 @@ function cleanInstalledDownload(): void {
 }
 
 /**
- * 开发运行（未打包）不检查：Squirrel 只能替换打包好的应用；MT_UPDATE_URL 只用于打包版本机测试。
- * 只发布了 macOS 安装包与 latest-mac.yml（D-028、D-032），其他平台不检查。
+ * 开发运行（未打包）不检查：只能替换打包好的应用；MT_UPDATE_URL 只用于打包版本机测试。
+ * 发布了 macOS 与 Windows 的安装包（D-028、D-032、D-036），其他平台不检查。
  */
 export function updateSupported(): boolean {
-  return app.isPackaged && process.platform === 'darwin'
+  return app.isPackaged && (process.platform === 'darwin' || process.platform === 'win32')
 }
 
 export function initUpdater(o: UpdaterOptions): void {
@@ -183,6 +186,7 @@ export function install(): { ok: boolean; error?: string } {
   const busy = opts?.busyReason()
   if (busy) return { ok: false, error: busy }
   log('quitAndInstall', state.version)
-  setImmediate(() => autoUpdater.quitAndInstall())
+  // Windows：静默安装（不显示安装界面），装完重新打开应用
+  setImmediate(() => (process.platform === 'win32' ? autoUpdater.quitAndInstall(true, true) : autoUpdater.quitAndInstall()))
   return { ok: true }
 }

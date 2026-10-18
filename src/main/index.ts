@@ -660,6 +660,8 @@ const gotLock = app.requestSingleInstanceLock()
 devlog('module evaluated, gotLock =', gotLock, 'isPackaged =', app.isPackaged)
 // 文本/语音应用无需 GPU 加速；规避部分环境下 GPU 初始化卡顿
 app.disableHardwareAcceleration()
+// Windows：系统通知按应用标识归属，须与安装包快捷方式的标识（electron-builder.yml 的 appId）一致，否则通知不显示（D-036）
+if (process.platform === 'win32') app.setAppUserModelId('com.mytypeless.desktop')
 if (!gotLock) {
   app.quit()
 } else {

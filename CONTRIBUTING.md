@@ -24,6 +24,7 @@
 - `npm run whisper:win` 编译 `mt-whisper`（多语种识别，whisper.cpp 源码，需要 git；只用 CPU）
 - Windows 默认主键是右 Ctrl（按住约 0.15 秒开始说话、轻按免手持；右 Ctrl+空格 提问；右 Ctrl+Shift 翻译）。没有右 Ctrl 的键盘在设置里改为 `rshift`（翻译 `rshift+ctrl`，右 Shift+字母照常打大写）或 `ralt`
 - 提交前同样跑 `npm run typecheck`、`npm run test`、`npm run build`、`npm run docs:check`（CI 有 Windows job）
+- `npm run dist` 在 Windows 上打包为 `release/MyTypeless-<版本>-<构建号>-x64.exe`（一键安装到当前用户，不签名）；没有 Windows 电脑时可在 Actions 页面手动运行 `release-windows`（标签留空），从构建产物下载安装包
 
 ## 提交流程
 
@@ -66,13 +67,13 @@ npm run native      # 改了 native/*.swift 时
 | 繁简转换 `mt-text` | Swift | 开源转换库 |
 | Whisper 引擎 `mt-whisper` | whisper.cpp + Metal | whisper.cpp（CPU / Vulkan） |
 | sherpa-onnx 助手 `mt-diarize` | C | 同一份 C 代码，换 Windows 预编译库 |
-| 打包 / 更新 | DMG + zip，Squirrel.Mac | NSIS 安装包，electron-updater |
+| 打包 / 更新 | DMG + zip，Squirrel.Mac | NSIS 安装包，electron-updater（已完成，D-036） |
 
 原生助手与主进程的协议见 [原生助手契约](docs/contracts/native-helpers.md)。有意做的话请先开 Issue，说明打算从哪部分开始。
 
 ## 发布
 
-正式版本由维护者用固定的签名证书，从已合并到 `main` 的提交打包，发布到本仓库的 [Releases](https://github.com/cjx157791216/MyTypeless/releases)（`npm run release`，版本标签打在对应提交上）；PR 里不需要升级版本号。
+正式版本由维护者用固定的签名证书，从已合并到 `main` 的提交打包，发布到本仓库的 [Releases](https://github.com/cjx157791216/MyTypeless/releases)（`npm run release`，版本标签打在对应提交上；Windows 安装包由 GitHub Actions 在同一次发布中打包上传，D-036）；PR 里不需要升级版本号。
 
 ## 安全问题
 

@@ -48,7 +48,7 @@ MyTypeless：macOS 上的 AI 语音听写工具（Electron + TypeScript + Swift 
 | `scripts/` | 原生编译、图标生成、文档脚本 `doc-kit/` | — |
 | `build/` | 打包资源：应用图标、entitlements | — |
 | `docs/` | 需求、决策、契约、验收与治理 | [AGENTS.md](docs/AGENTS.md) |
-| `.github/` | CI（`workflows/ci.yml`：macOS 上 typecheck / test / build / docs:check / native；Windows 上 diarize:win / whisper:win / typecheck / test / build）、Issue 与 PR 模板 | [CONTRIBUTING.md](CONTRIBUTING.md) |
+| `.github/` | CI（`workflows/ci.yml`：macOS 上 typecheck / test / build / docs:check / native；Windows 上 diarize:win / whisper:win / typecheck / test / build；`release-windows.yml`：发布时打 Windows 安装包，D-036）、Issue 与 PR 模板 | [CONTRIBUTING.md](CONTRIBUTING.md) |
 
 常见改动的完整步骤见 [docs/development/recipes.md](docs/development/recipes.md)。
 
@@ -67,8 +67,8 @@ npm run dev            # 开发运行；shell 里有 ELECTRON_RUN_AS_NODE=1 时�
 npm run typecheck
 npm run test
 npm run build
-npm run dist           # 编译 + 原生助手 + 签名证书 + 打包到 release/MyTypeless-<版本>-<构建号>-arm64.dmg（scripts/dist.cjs）
-npm run release        # 发布为本仓库的 GitHub Release（在线更新，D-028、D-032）：GH_TOKEN=$(gh auth token) 且加 --yes，人工门禁
+npm run dist           # 编译 + 原生助手 + 签名证书 + 打包到 release/MyTypeless-<版本>-<构建号>-arm64.dmg（scripts/dist.cjs）；Windows 上打包为 -x64.exe（D-036）
+npm run release        # 发布为本仓库的 GitHub Release（在线更新，D-028、D-032）：GH_TOKEN=$(gh auth token) 且加 --yes，人工门禁；同时由 Actions 打 Windows 包（D-036）
 npm run docs:context -- --task <id> --mode <analysis|implementation|review>
 npm run docs:check
 ```
@@ -99,6 +99,7 @@ npm run docs:check
 - Windows 移植（GAP-008）：调用 macOS 专有能力（`systemPreferences.isTrustedAccessibilityClient` / `askForMediaAccess`、`tccutil`、`defaults`、`ps`、`osascript`、`x-apple.systempreferences:`、模板图、`titleBarStyle: 'hiddenInset'`、`type: 'panel'`）前先判断 `process.platform`——这些在 Windows 上要么不存在（直接抛错，整个启动流程中断），要么行为不同。界面上的键名、系统设置路径、默认快捷键（Windows 主键右 Ctrl）用 `src/shared/platform.ts`，只属于 macOS 的元素加 `mac-only` 类、只属于其他平台的加 `non-mac`。
 - Windows 读选区 / 光标上下文（`mt-focus`，D-012）：Chromium / Electron 应用要先唤醒辅助功能，且唤醒前已获得焦点的输入框要等光标动一次才可读（真实流程里听写开始时的选区检查负责唤醒，写入后自动词典就能读到）；WinForms 文本框经系统代理“支持”文本模式却读出空串，要退到 `EM_GETSEL` / `WM_GETTEXT`；端到端测试只能对自建窗口操作（脚本发按键前核对前台进程与窗口标题），不能用记事本等真实应用（Windows 11 记事本会恢复用户未关闭的标签页）。
 - Windows 上不能直接 `npm install`：better-sqlite3 没有 Node 24 的 Windows 预编译包（现场编译要 VS 的 ClangCL 组件），Electron 33 的安装脚本在 Node 24 下只解压出第一个文件却报告成功；用 `npm run setup:win`（跳过安装脚本、按 Electron ABI 下载预编译包、解压不完整时用系统 tar）。CI 的 Windows job 只跑 typecheck / test / build，用 `npm ci --ignore-scripts` 即可。Windows 上开发服务器固定监听 127.0.0.1（`localhost` 可能只解析到 `::1`，Electron 连接被拒，窗口白屏）。
+- Windows 安装包（D-036）：electron-builder 给 exe 写图标要用 winCodeSign 工具包，包里有 macOS 符号链接，没开开发者模式的普通用户解压失败、打包中止——`scripts/dist.cjs` 的 `prepareWinCodeSign` 预先解压（跳过 darwin 目录）；Windows 不传 `buildVersion`（文件版本每段最大 65535，放不下 YYYYMMDD 构建号）。安装版与开发版共用 `%APPDATA%\MyTypeless` 和单实例锁：开发版开着时安装版（包括更新后自动重新打开的那次）一启动就把窗口交给开发版并退出，测安装版先关开发版或用 `--user-data-dir`。`workflow_dispatch` 的工作流必须在默认分支上才能被触发：`release-windows.yml` 合并前无法从 `npm run release` 触发。
 
 ## 任务流程
 

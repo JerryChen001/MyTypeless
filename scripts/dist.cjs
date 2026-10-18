@@ -4,10 +4,10 @@
  * - 版本号：package.json 的 version（发布新版本时手动升级）
  * - 构建号：打包时的本地时间 YYYYMMDD.HHmm，写进应用（关于、主窗口、托盘）、CFBundleVersion 与安装包文件名
  * - 提交：git 短哈希（有未提交改动时加 -dirty），显示在应用的“关于”里，便于对照代码
- * 产物：release/MyTypeless-<版本>-<构建号>-arm64.dmg / -mac.zip
+ * 产物：macOS release/MyTypeless-<版本>-<构建号>-arm64.dmg / .zip；Windows release/MyTypeless-<版本>-<构建号>-x64.exe（D-036）
  */
-const { execSync } = require('child_process')
-const { readFileSync, writeFileSync } = require('fs')
+const { execFileSync, execSync } = require('child_process')
+const { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } = require('fs')
 const { join } = require('path')
 
 const root = join(__dirname, '..')
@@ -30,12 +30,46 @@ const env = { ...process.env, MT_BUILD: build, MT_COMMIT: commit, CSC_IDENTITY_A
 console.log(`MyTypeless ${version} 构建 ${build}（${commit}）`)
 
 const run = (cmd) => execSync(cmd, { cwd: root, env, stdio: 'inherit' })
+
+// 与 electron-builder 自己下载（校验过 sha512）的那份逐字节相同
+const WIN_CODE_SIGN_SHA256 = 'cdaec7154dda7cc31f88d886e2489379a0625a737d610b5ae7f62a12f16743a4'
+/**
+ * electron-builder 给 exe 写图标和版本信息要用 winCodeSign 工具包，但包里有 macOS 的符号链接：没开“开发者模式”的
+ * 普通用户解压时报错，打包中止。预先解压到它的缓存目录（跳过用不到的 darwin 目录），electron-builder 见到就直接用
+ */
+function prepareWinCodeSign() {
+  const cache = process.env.ELECTRON_BUILDER_CACHE || join(process.env.LOCALAPPDATA, 'electron-builder', 'Cache')
+  const dir = join(cache, 'winCodeSign', 'winCodeSign-2.6.0')
+  if (existsSync(join(dir, 'rcedit-x64.exe'))) return
+  const archive = join(cache, 'winCodeSign', 'winCodeSign-2.6.0.7z')
+  mkdirSync(join(cache, 'winCodeSign'), { recursive: true })
+  run(`curl -fL --retry 3 -o "${archive}" https://github.com/electron-userland/electron-builder-binaries/releases/download/winCodeSign-2.6.0/winCodeSign-2.6.0.7z`)
+  const sha = require('crypto').createHash('sha256').update(readFileSync(archive)).digest('hex')
+  if (sha !== WIN_CODE_SIGN_SHA256) {
+    rmSync(archive, { force: true })
+    throw new Error(`winCodeSign-2.6.0.7z 的 SHA256 不符：期望 ${WIN_CODE_SIGN_SHA256}，实际 ${sha}`)
+  }
+  execFileSync(require('7zip-bin').path7za, ['x', '-y', '-bd', `-o${dir}`, '-xr!darwin', archive], { stdio: 'inherit' })
+  rmSync(archive, { force: true })
+}
+
+const win = process.platform === 'win32'
 run('npm run build')
-run('npm run native')
-run('npm run whisper')
-run('npm run diarize')
-run('bash scripts/setup-signing.sh')
-run(`npx electron-builder --mac --publish never -c.buildVersion=${build}`)
+if (win) {
+  // Windows（D-036）：没有代码签名证书，不签名
+  run('npm run native:win')
+  run('npm run diarize:win')
+  run('npm run whisper:win')
+  prepareWinCodeSign()
+  // 不传 buildVersion：Windows 的文件版本每段最大 65535，构建号 YYYYMMDD 放不下（构建号已由 MT_BUILD 写进应用与文件名）
+  run('npx electron-builder --win --x64 --publish never')
+} else {
+  run('npm run native')
+  run('npm run whisper')
+  run('npm run diarize')
+  run('bash scripts/setup-signing.sh')
+  run(`npx electron-builder --mac --publish never -c.buildVersion=${build}`)
+}
 // 发布（npm run release）据此核对：发布的版本必须对应已合并到 GitHub main、没有未提交改动的提交
 writeFileSync(join(root, 'release/build-info.json'), JSON.stringify({ version, build, sha, dirty }, null, 2) + '\n')
-console.log(`→ release/MyTypeless-${version}-${build}-arm64.dmg`)
+console.log(`→ release/MyTypeless-${version}-${build}-${win ? 'x64.exe' : 'arm64.dmg'}`)
