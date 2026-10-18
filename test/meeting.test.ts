@@ -1,7 +1,7 @@
 // 会议模式（D-015）：分句、说话人聚类、纪要整理、Markdown 展示
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { ALIGN_TOLERANCE, MEETING_VAD_DENOISED, UtteranceSegmenter, alignPad, planFeed, samplesToMs, splitByTurns, turnsInUtterance } from '../src/main/meeting/segmenter.ts'
+import { ALIGN_TOLERANCE, DENOISE_MAX_LAG, MEETING_VAD, MEETING_VAD_DENOISED, UtteranceSegmenter, alignPad, denoiseLagging, overloaded, planFeed, samplesToMs, splitByTurns, turnsInUtterance } from '../src/main/meeting/segmenter.ts'
 import { readFileSync } from 'node:fs'
 import { OnlineClusterer, regroup, identifySpeakers, printScore, splitByWindows, blendVoiceprint, cosine, normalize, mergeAdjacentParts, type ClusterItem } from '../src/main/meeting/cluster.ts'
 import { buildTranscript, chunkTranscript, formatClock, formatDuration, minutesHeader, cleanMinutesBody, exportMarkdown } from '../src/main/meeting/minutes.ts'
@@ -203,6 +203,26 @@ test('整体归类：按参会人数合并；手动指定的段与命名过的�
   const withShort = [...items, { id: 99, speaker: 3, v: null, durMs: 400, locked: false }]
   const r2 = regroup(withShort, { expected: 4, create: () => next++ })
   assert.equal(r2.assign.get(99), r2.assign.get(items.find((it) => it.speaker === 3)!.id), '没有声纹的短段跟随原说话人')
+})
+
+test('降噪跟不上（电脑忙）：落后超过 8 秒即改用原始录音分句，换门槛后时间线位置连续、照常分出句子', () => {
+  assert.equal(DENOISE_MAX_LAG, 8 * 16000)
+  assert.equal(denoiseLagging(10 * 16000, 9 * 16000), false)
+  assert.equal(denoiseLagging(20 * 16000, 11 * 16000), true)
+  const seg = new UtteranceSegmenter(MEETING_VAD_DENOISED)
+  const tone = (n: number, amp: number) => Int16Array.from({ length: n }, (_, i) => Math.round(amp * Math.sin(i / 3)))
+  seg.push(new Int16Array(16000)) // 1 秒静音
+  seg.useVad(MEETING_VAD)
+  assert.equal(seg.position(), 16000)
+  const out = [...seg.push(new Int16Array(16000)), ...seg.push(tone(16000, 3000)), ...seg.push(new Int16Array(16000))]
+  assert.equal(out.length, 1)
+  assert.ok(out[0].start >= 2 * 16000 - 4000 && out[0].start < 2 * 16000, `句首 ${out[0].start}`)
+})
+
+test('处理积压（电脑忙）：排队的句子超过上限时不再做句内换人切分，优先保证转写跟上', () => {
+  assert.equal(overloaded(0), false)
+  assert.equal(overloaded(3), false)
+  assert.equal(overloaded(4), true)
 })
 
 test('整体归类：会议刚开始、有声纹的句子比参会人数少时不报错，各句保持原归属', () => {
