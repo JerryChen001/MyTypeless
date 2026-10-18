@@ -38,7 +38,7 @@ mac:
     - target: zip
       arch:
         - arm64
-# Windows（D-036）：一键安装到当前用户（%LOCALAPPDATA%\Programs，不要管理员权限）；没有代码签名证书
+# Windows（D-036）：安装包一键安装到当前用户（%LOCALAPPDATA%\Programs，不要管理员权限）；没有代码签名证书
 win:
   icon: build/icon.png
   extraResources:
@@ -49,6 +49,10 @@ win:
         - "!*.old-*"
   target:
     - target: nsis
+      arch:
+        - x64
+    # 解压即用版：数据同样在 %APPDATA%\MyTypeless（与安装版共用），只提示新版本、手动下载新的 zip
+    - target: zip
       arch:
         - x64
 nsis:

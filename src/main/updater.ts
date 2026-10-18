@@ -1,9 +1,9 @@
 import { app, Notification } from 'electron'
-import { appendFileSync, mkdirSync, readFileSync, rmSync } from 'fs'
-import { join } from 'path'
+import { appendFileSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'fs'
+import { dirname, join } from 'path'
 import { autoUpdater, CancellationToken, type UpdateInfo } from 'electron-updater'
 import type { UpdateState } from '../shared/types'
-import { friendlyUpdateError, pendingIsInstalled, UPDATE_FIRST_CHECK_MS, UPDATE_INTERVAL_MS, UPDATER_CACHE_DIR, updateUrl } from './update-info'
+import { friendlyUpdateError, isUnpackedWin, pendingIsInstalled, releasePageUrl, UPDATE_FIRST_CHECK_MS, UPDATE_INTERVAL_MS, UPDATER_CACHE_DIR, updateUrl } from './update-info'
 
 /**
  * 在线更新（D-028）：定时检查发布地址的版本说明（macOS latest-mac.yml、Windows latest.yml）→ 发现新版本时提示 →
@@ -27,6 +27,8 @@ let cancelToken: CancellationToken | null = null
 let timer: NodeJS.Timeout | null = null
 let notified = '' // 已通知过的版本（每个版本只弹一次系统通知）
 let manualCheck = false
+/** Windows 解压即用版（zip）：只提示新版本，手动下载（D-036） */
+let manualOnly = false
 
 function log(...parts: unknown[]): void {
   try {
@@ -44,10 +46,12 @@ function set(next: UpdateState): void {
   opts?.onState(state)
 }
 
-function infoFields(info: UpdateInfo): Pick<UpdateState, 'version' | 'build' | 'notes' | 'dmgUrl'> {
+function infoFields(info: UpdateInfo): Pick<UpdateState, 'version' | 'build' | 'notes' | 'dmgUrl' | 'manual'> {
   const extra = info as UpdateInfo & { build?: string; dmgUrl?: string }
   const notes = typeof info.releaseNotes === 'string' ? info.releaseNotes : (info.releaseNotes ?? []).map((n) => n.note ?? '').join('\n')
-  return { version: info.version, build: extra.build, notes: notes.trim() || undefined, dmgUrl: extra.dmgUrl }
+  // 解压即用版：下载地址是这个版本的 Release 页面（用户自己下载新的 zip）
+  const dmgUrl = manualOnly ? releasePageUrl(info.version) : extra.dmgUrl
+  return { version: info.version, build: extra.build, notes: notes.trim() || undefined, dmgUrl, manual: manualOnly || undefined }
 }
 
 function notify(title: string, body: string): void {
@@ -83,6 +87,11 @@ export function updateSupported(): boolean {
 
 export function initUpdater(o: UpdaterOptions): void {
   opts = o
+  try {
+    manualOnly = isUnpackedWin(process.platform, readdirSync(dirname(process.execPath)))
+  } catch {
+    manualOnly = false
+  }
   if (!updateSupported()) {
     state = { state: 'unsupported', error: app.isPackaged ? '当前平台暂不支持在线更新' : '开发版不检查更新' }
     return
@@ -165,6 +174,7 @@ export async function check(manual = true): Promise<UpdateState> {
 /** 用户确认后下载（进度经 onState 推送） */
 export function download(): UpdateState {
   if (state.state !== 'available' && !(state.state === 'error' && state.version)) return state
+  if (manualOnly) return state // 解压即用版不能自动安装，界面改为打开下载页
   cancelToken = new CancellationToken()
   const token = cancelToken
   set({ ...state, state: 'downloading', percent: 0, bytesPerSec: undefined, error: undefined })

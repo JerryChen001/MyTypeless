@@ -4,12 +4,12 @@
  * 由 Mac 上的 npm run release 触发，发布者不需要 Windows 电脑。
  * - 取 release/ 里当前版本最新的 MyTypeless-<版本>-<构建号>-x64.exe，写版本说明 release/latest.yml（安装包绝对地址，
  *   与 latest-mac.yml 同一格式；electron-builder 自带的 latest.yml 是相对地址，发布新版本的瞬间可能指错，覆盖掉）
- * - 上传到标签为 MT_TAG 的草稿（必须是草稿：转正式由 npm run release 在两个平台都传完后做）；重跑时先删掉同名文件
+ * - 连同解压即用版 MyTypeless-<版本>-<构建号>-x64.zip 上传到标签为 MT_TAG 的草稿（必须是草稿：转正式由 npm run release 在两个平台都传完后做）；重跑时先删掉同名文件
  * 环境变量：GITHUB_REPOSITORY（Actions 自带）、GH_TOKEN（工作流的 GITHUB_TOKEN，contents: write）、MT_TAG（如 v0.3.1）、MT_NOTES（更新内容）
  */
 const { existsSync, openAsBlob, readdirSync, readFileSync, statSync, writeFileSync } = require('fs')
 const { join } = require('path')
-const { buildFeed, gh, githubAssetUrl, githubRepo, parseWinArtifact, sha512 } = require('./publish.cjs')
+const { buildFeed, gh, githubAssetUrl, githubRepo, parseWinArtifact, parseWinZip, sha512 } = require('./publish.cjs')
 
 const root = join(__dirname, '..')
 
@@ -41,9 +41,10 @@ async function main() {
   const rel = (await gh(token, 'GET', `/repos/${repo}/releases?per_page=30`)).find((r) => r.tag_name === tag)
   if (!rel) throw new Error(`${repo} 没有 ${tag} 的 Release：应由 npm run release 先建草稿`)
   if (!rel.draft) throw new Error(`${repo} 的 ${tag} 已经正式发布，不能再改`)
-  const files = [exePath, feedFile]
+  const zipPath = join(dir, `MyTypeless-${version}-${build}-x64.zip`) // 解压即用版，与安装包同一次打包
+  const files = [exePath, zipPath, feedFile]
   for (const a of await gh(token, 'GET', `/repos/${repo}/releases/${rel.id}/assets?per_page=100`)) {
-    if (files.some((f) => f.endsWith(a.name)) || parseWinArtifact(a.name)) await gh(token, 'DELETE', `/repos/${repo}/releases/assets/${a.id}`)
+    if (files.some((f) => f.endsWith(a.name)) || parseWinArtifact(a.name) || parseWinZip(a.name)) await gh(token, 'DELETE', `/repos/${repo}/releases/assets/${a.id}`)
   }
   const uploadBase = rel.upload_url.replace(/\{.*\}$/, '')
   for (const file of files) {

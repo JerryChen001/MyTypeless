@@ -38,6 +38,19 @@ export function pendingIsInstalled(fileName: string, current: string): boolean {
   return !!v && compareVersions(v, current) <= 0
 }
 
+/**
+ * Windows 解压即用版（zip，D-036）：程序旁边没有 NSIS 安装时放的卸载程序。它不能自动更新（新版本的安装包会装到另一个位置），
+ * 只提示新版本、打开 Release 页面让用户手动下载。files：程序所在目录的文件名
+ */
+export function isUnpackedWin(platform: string, files: string[]): boolean {
+  return platform === 'win32' && !files.includes('Uninstall MyTypeless.exe')
+}
+
+/** 某个版本的 Release 页面（解压即用版手动下载新 zip） */
+export function releasePageUrl(version: string): string {
+  return `https://github.com/${GITHUB_REPO}/releases/tag/v${version}`
+}
+
 /** electron-updater / Squirrel 的错误 → 给用户看的一句话 */
 export function friendlyUpdateError(message: string): string {
   const m = message || ''

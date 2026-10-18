@@ -72,4 +72,4 @@ if (win) {
 }
 // 发布（npm run release）据此核对：发布的版本必须对应已合并到 GitHub main、没有未提交改动的提交
 writeFileSync(join(root, 'release/build-info.json'), JSON.stringify({ version, build, sha, dirty }, null, 2) + '\n')
-console.log(`→ release/MyTypeless-${version}-${build}-${win ? 'x64.exe' : 'arm64.dmg'}`)
+console.log(`→ release/MyTypeless-${version}-${build}-${win ? 'x64.exe / .zip' : 'arm64.dmg'}`)

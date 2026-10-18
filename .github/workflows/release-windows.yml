@@ -59,5 +59,6 @@ jobs:
           name: MyTypeless-windows
           path: |
             release/MyTypeless-*-x64.exe
+            release/MyTypeless-*-x64.zip
             release/latest.yml
           retention-days: 14

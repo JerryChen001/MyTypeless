@@ -128,7 +128,8 @@ export interface UpdateState {
   version?: string // 新版本号
   build?: string // 新版本构建号
   notes?: string // 更新内容
-  dmgUrl?: string // 安装包下载地址（自动安装失败时手动下载）
+  dmgUrl?: string // 安装包下载地址（自动安装失败时手动下载；Windows 解压即用版为 Release 页面）
+  manual?: boolean // Windows 解压即用版（zip）：只提示新版本，用户手动下载（D-036）
   percent?: number // 下载进度 0～100
   bytesPerSec?: number
   error?: string
