@@ -2,7 +2,7 @@
 /**
  * 打包（npm run dist）：生成本次的构建号，依次编译代码与原生助手、准备签名证书、调用 electron-builder。
  * - 版本号：package.json 的 version（发布新版本时手动升级）
- * - 构建号：打包时的本地时间 YYYYMMDD.HHmm，写进应用（关于、主窗口、托盘）、CFBundleVersion 与安装包文件名
+ * - 构建号：打包时间（北京时间）YYYYMMDD.HHmm，写进应用（关于、主窗口、托盘）、CFBundleVersion 与安装包文件名
  * - 提交：git 短哈希（有未提交改动时加 -dirty），显示在应用的“关于”里，便于对照代码
  * 产物：macOS release/MyTypeless-<版本>-<构建号>-arm64.dmg / .zip；Windows release/MyTypeless-<版本>-<构建号>-win-x64.exe（D-036）
  */
@@ -12,8 +12,10 @@ const { join } = require('path')
 
 const root = join(__dirname, '..')
 const pad = (n) => String(n).padStart(2, '0')
-const now = new Date()
-const build = `${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}.${pad(now.getHours())}${pad(now.getMinutes())}`
+// 构建号一律按北京时间（UTC+8，与发布者 Mac 的时间一致）：Windows 包在 GitHub 的机器（UTC）上打，各地贡献者的时区也不同
+const BUILD_UTC_OFFSET_HOURS = 8
+const now = new Date(Date.now() + BUILD_UTC_OFFSET_HOURS * 3600_000)
+const build = `${now.getUTCFullYear()}${pad(now.getUTCMonth() + 1)}${pad(now.getUTCDate())}.${pad(now.getUTCHours())}${pad(now.getUTCMinutes())}`
 let commit = 'unknown'
 let sha = ''
 let dirty = false
