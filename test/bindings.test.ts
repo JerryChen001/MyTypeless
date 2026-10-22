@@ -1,6 +1,6 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { parseBinding } from '../src/main/bindings.ts'
+import { hotkeysChanged, parseBinding } from '../src/main/bindings.ts'
 import { defaultBindings } from '../src/shared/platform.ts'
 
 test('parseBinding：单修饰键触发没有兜底加速键', () => {
@@ -42,4 +42,15 @@ test('默认快捷键：macOS 用 Fn，Windows 用右 Ctrl，且都能被解析�
   for (const combo of [win.bindings.dictation, win.bindings.translate, win.bindings.ask]) assert.ok(parseBinding('m', combo, 'win32'))
   const mac = defaultBindings('darwin')
   for (const combo of [mac.bindings.dictation, mac.bindings.translate, mac.bindings.ask]) assert.ok(parseBinding('m', combo, 'darwin'))
+})
+
+test('hotkeysChanged：只有实际生效的快捷键变了才重新注册（切换个人 / 会议模式等其他设置不重启快捷键助手）', () => {
+  const base = { hotkeyKey: 'rctrl', bindings: { dictation: 'rctrl', translate: 'rctrl+shift', rewrite: '', ask: 'rctrl+space' } }
+  assert.equal(hotkeysChanged(base, { ...base, bindings: { ...base.bindings } }), false)
+  assert.equal(hotkeysChanged(base, { ...base, bindings: { ...base.bindings, rewrite: 'alt+r' } }), true)
+  assert.equal(hotkeysChanged(base, { ...base, bindings: { ...base.bindings, dictation: 'rshift' } }), true)
+  // 听写没设时用 hotkeyKey：hotkeyKey 变了就要重新注册；听写已设时 hotkeyKey 不生效
+  const legacy = { hotkeyKey: 'rctrl', bindings: { ...base.bindings, dictation: '' } }
+  assert.equal(hotkeysChanged(legacy, { ...legacy, hotkeyKey: 'rshift' }), true)
+  assert.equal(hotkeysChanged(base, { ...base, hotkeyKey: 'rshift' }), false)
 })
