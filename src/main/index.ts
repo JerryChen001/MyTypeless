@@ -9,6 +9,7 @@ import { loadSettings, saveSettings, hasKey, keyMask, setKey, maskKey, getKey } 
 import { LlmPolisher, describeLlmError } from './polish'
 import { DictationSessionManager } from './session'
 import { HotkeyController } from './hotkeys'
+import { hotkeysChanged } from './bindings'
 import { listHistory, getHistory, deleteHistory, clearHistory, listWords, addWord, removeWord, historyStats, listStyleSamples, deleteStyleSample, clearStyleSamples } from './history'
 import { checkAccessibility, injectText, openAccessibilitySettings } from './inject'
 import { activateApp, getFrontApp, setNoActivate } from './native'
@@ -547,7 +548,7 @@ function registerIpc(): void {
       whisperEngine.stop()
     }
     if (next.asr.provider !== 'builtin' || selectedEngine(next) !== 'firered') fireredEngine.stop()
-    hotkeys.registerAll()
+    if (hotkeysChanged(prev, next)) hotkeys.registerAll()
     applyLoginItem(next)
     updater.schedule()
     rebuildTrayMenu()
