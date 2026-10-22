@@ -1,3 +1,4 @@
+import type { Settings } from '../shared/types'
 import type { HotkeyMatchConfig } from './native'
 
 /**
@@ -63,4 +64,20 @@ export function parseBinding(mode: string, combo: string, platform: string = pro
     if (accelKey) accelerator = require.map((m) => ACCEL_MOD[m]).concat(accelKey).join('+')
   }
   return { match: { name: mode, key, require }, accelerator }
+}
+
+/** 四个模式实际生效的快捷键（与 HotkeyController.registerAll 的取值一致：听写没设时用 hotkeyKey） */
+function effectiveCombos(s: Pick<Settings, 'hotkeyKey' | 'bindings'>): string[] {
+  const b = s.bindings
+  return [b?.dictation || s.hotkeyKey, b?.translate ?? '', b?.rewrite ?? '', b?.ask ?? '']
+}
+
+/**
+ * 保存设置后要不要重新注册快捷键（会重启原生助手）：只在实际生效的快捷键变了时才要。
+ * 其他设置（切换个人 / 会议模式等）也重启的话，重启那几十毫秒里状态是“兜底模式”，主窗口恰好此时刷新就一直显示兜底
+ */
+export function hotkeysChanged(prev: Pick<Settings, 'hotkeyKey' | 'bindings'>, next: Pick<Settings, 'hotkeyKey' | 'bindings'>): boolean {
+  const a = effectiveCombos(prev)
+  const b = effectiveCombos(next)
+  return a.some((c, i) => c !== b[i])
 }
